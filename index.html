@@ -134,9 +134,12 @@ body.light-mode .url-row input,body.light-mode .url-row select,body.light-mode .
 <section class="overlay" id="instructionsOverlay" role="dialog" aria-modal="true" aria-labelledby="instructionsTitle">
  <div class="dialog">
   <h1 id="instructionsTitle">You found the hidden light mode!</h1>
-  <p>The calculator is now in light mode. Your secret sequence is complete.</p>
-  <p><strong>Calculator instructions</strong></p>
-  <p>Tap AC to clear the current calculation. Use the number keys to enter values, the orange keys to choose an operation, and = to calculate the answer. Tap the button below whenever you want to return to dark mode.</p>
+  <p>The calculator is now in light mode. Here are the two hidden sequences:</p>
+  <p><strong>Open School Mode</strong></p>
+  <p>1. Click AC 10 times within 10 seconds. 2. When the counter appears, click AC 100 more times until it reaches 100 (110 AC clicks total). School Mode opens automatically.</p>
+  <p><strong>Show these instructions and turn on Light Mode</strong></p>
+  <p>1. Click = five times. 2. Enter 1000 using the calculator number keys. 3. Within 8 seconds, enter 6767676767676767 by alternating 6 and 7. Light Mode turns on and this instructions window appears.</p>
+  <p>Use the button below to switch back to dark mode.</p>
   <div class="dialog-actions"><button class="primary" id="toggleTheme" type="button">Switch to dark mode</button><button class="secondary" id="closeInstructions" type="button">Close</button></div>
  </div>
 </section>
@@ -162,39 +165,64 @@ keys.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)retur
 document.addEventListener('keydown',e=>{if(document.getElementById('codeOverlay').classList.contains('open')){if(/^[0-9]$/.test(e.key))addCode(e.key);else if(e.key==='Backspace')addCode('back');else if(e.key==='Enter')unlock();else if(e.key==='Escape')closeCode();return}if(/^[0-9]$/.test(e.key))digit(e.key);else if(e.key==='.'||e.key===',')decimal();else if(e.key==='Enter'||e.key==='='){e.preventDefault();equal()}else if(e.key==='Escape'||e.key==='Delete')action('clear');else if(e.key==='Backspace')action('backspace');else if(({'+':1,'-':1,'*':1,'/':1})[e.key])choose(({'+':'+','-':'−','*':'×','/':'÷'})[e.key]);else if(e.key==='%')action('percent')});
 draw();
 
-// Hidden unlock sequence: 10 AC taps in 10 seconds, then 100 additional AC taps,
-// five equals taps, enter 1000, then rapidly tap 6-7 eight times.
+// School Mode unlock: 10 AC taps within 10 seconds, then 100 more AC taps.
 const clearKey=document.getElementById('clearKey');
 const acCounter=document.getElementById('acCounter');
-let acWarmup=0,acWarmupStart=0,acCount=0,secretStage='idle';
-let equalsCount=0,secretNumber='',patternIndex=0,patternStarted=0;
-function showSecretCounter(){acCounter.style.display=secretStage==='count'?'block':'none';if(secretStage==='count')acCounter.textContent='AC COUNT  '+acCount+' / 100';}
+let acWarmup=0,acWarmupStart=0,acCount=0,schoolUnlocked=false;
 function handleAcTap(){
  const now=Date.now();
- if(secretStage==='idle'){
+ if(schoolUnlocked)return;
+ if(!acCount){
   if(!acWarmup||now-acWarmupStart>10000){acWarmup=0;acWarmupStart=now}
   acWarmup++;
-  if(acWarmup>=10){secretStage='count';acCount=0;showSecretCounter();screen.textContent='0';}
- }else if(secretStage==='count'){
-  acCount++;showSecretCounter();
-  if(acCount>=100){secretStage='equals';acCounter.textContent='NEXT: TAP = 5 TIMES';screen.textContent='100';}
+  if(acWarmup>=10){
+   acCount=0;
+   acCounter.style.display='block';
+   acCounter.textContent='AC COUNT  0 / 100';
+   screen.textContent='0';
+  }
+  return;
+ }
+ acCount++;
+ acCounter.textContent='AC COUNT  '+acCount+' / 100';
+ if(acCount>=100){
+  schoolUnlocked=true;
+  acCounter.style.display='none';
+  document.getElementById('schoolOverlay').classList.add('open');
  }
 }
+
+// Separate hidden sequence: five = taps, 1000, then 6767676767676767 within 8 seconds.
+// Completing it enables light mode and displays instructions for both secrets.
+let hintEquals=0,hintStage='equals',hintNumber='',hintPatternIndex=0,hintPatternStarted=0;
 function secretDigit(d){
- if(secretStage==='enter1000'){
-  secretNumber+=d;screen.textContent=secretNumber||'0';
-  if(secretNumber.length>=4){
-   if(secretNumber==='1000'){secretStage='pattern';patternIndex=0;patternStarted=Date.now();screen.textContent='6-7-6-7';acCounter.style.display='block';acCounter.textContent='NOW TAP 6 AND 7 QUICKLY';}
-   else{secretNumber='';screen.textContent='TRY 1000';}
+ if(hintStage==='number'){
+  hintNumber+=d;
+  screen.textContent=hintNumber;
+  if(hintNumber.length>=4){
+   if(hintNumber==='1000'){
+    hintStage='pattern';hintPatternIndex=0;hintPatternStarted=Date.now();
+    screen.textContent='6-7-6-7';
+    acCounter.style.display='block';
+    acCounter.textContent='NOW TAP 6 AND 7 QUICKLY';
+   }else{
+    hintNumber='';screen.textContent='TRY 1000';
+   }
   }
   return true;
  }
- if(secretStage==='pattern'){
-  const expected=patternIndex%2===0?'6':'7';
-  if(Date.now()-patternStarted>8000||d!==expected){patternIndex=0;patternStarted=Date.now();acCounter.textContent='SEQUENCE RESET — 6 THEN 7';return true;}
-  patternIndex++;
-  if(patternIndex>=16){
-   secretStage='done';document.body.classList.add('light-mode');acCounter.style.display='none';
+ if(hintStage==='pattern'){
+  const expected=hintPatternIndex%2===0?'6':'7';
+  if(Date.now()-hintPatternStarted>8000||d!==expected){
+   hintPatternIndex=0;hintPatternStarted=Date.now();
+   acCounter.textContent='SEQUENCE RESET — 6 THEN 7';
+   return true;
+  }
+  hintPatternIndex++;
+  if(hintPatternIndex>=16){
+   hintStage='done';
+   document.body.classList.add('light-mode');
+   acCounter.style.display='none';
    document.getElementById('instructionsOverlay').classList.add('open');
   }
   return true;
@@ -202,12 +230,16 @@ function secretDigit(d){
  return false;
 }
 function secretEquals(){
- if(secretStage==='equals'){
-  equalsCount++;screen.textContent='= '+equalsCount+'/5';
-  if(equalsCount>=5){secretStage='enter1000';secretNumber='';screen.textContent='ENTER 1000';acCounter.style.display='block';acCounter.textContent='TYPE 1000';}
-  return true;
+ if(hintStage!=='equals')return false;
+ hintEquals++;
+ screen.textContent='= '+hintEquals+'/5';
+ if(hintEquals>=5){
+  hintStage='number';hintNumber='';
+  screen.textContent='ENTER 1000';
+  acCounter.style.display='block';
+  acCounter.textContent='TYPE 1000';
  }
- return false;
+ return true;
 }
 clearKey.addEventListener('click',handleAcTap);
 document.getElementById('toggleTheme').addEventListener('click',()=>{
