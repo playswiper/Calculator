@@ -4,11 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta name="theme-color" content="#000000">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
 <title>Calculator</title>
 <style>
 :root{color-scheme:dark;--orange:#ff9f0a;--panel:#171717;--muted:#a5a5a5}
 *{box-sizing:border-box}
-html,body{margin:0;min-height:100%;background:#000;color:#fff;font-family:Arial,Helvetica,sans-serif}
+html,body{margin:0;min-height:100%;background:#000;color:#fff;font-family:"Fredoka",sans-serif}
 body{min-height:100dvh;display:grid;place-items:center;padding:16px}
 button,input{font:inherit}
 button{cursor:pointer}
@@ -41,7 +44,7 @@ button{cursor:pointer}
 .url-row{display:flex;gap:8px}
 .url-row input{flex:1;min-width:0;background:#050505;color:white;border:1px solid #393939;border-radius:11px;padding:12px}
 .primary{background:var(--orange);color:#111;border:0;border-radius:11px;padding:12px 16px;font-weight:700}
-.source{white-space:pre;overflow:auto;max-height:48dvh;background:#050505;border:1px solid #333;border-radius:12px;padding:14px;font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;color:#ddd;margin-top:14px;tab-size:2}
+.source{white-space:pre;overflow:auto;max-height:48dvh;background:#050505;border:1px solid #333;border-radius:12px;padding:14px;font:12px/1.5 "Fredoka",sans-serif;color:#ddd;margin-top:14px;tab-size:2}
 @media(min-width:500px){.calculator{width:360px}.keys{gap:12px}.key{font-size:28px}}
 </style>
 </head>
@@ -56,7 +59,7 @@ button{cursor:pointer}
     <button class="key" data-digit="7">7</button><button class="key" data-digit="8">8</button><button class="key" data-digit="9">9</button><button class="key operator" data-op="×">×</button>
     <button class="key" data-digit="4">4</button><button class="key" data-digit="5">5</button><button class="key" data-digit="6">6</button><button class="key operator" data-op="−">−</button>
     <button class="key" data-digit="1">1</button><button class="key" data-digit="2">2</button><button class="key" data-digit="3">3</button><button class="key operator" data-op="+">+</button>
-    <button class="key" data-action="backspace">⌫</button><button class="key zero" data-digit="0">0</button><button class="key" data-action="decimal">.</button><button class="key operator" data-action="equals">=</button>
+    <button class="key" data-action="backspace" aria-label="Backspace" title="Backspace">←</button><button class="key zero" data-digit="0">0</button><button class="key" data-action="decimal">.</button><button class="key operator" data-action="equals">=</button>
   </div>
 </main>
 
@@ -86,7 +89,7 @@ button{cursor:pointer}
   <p class="error" id="sourceError" style="margin-top:12px"></p>
   <pre class="source" id="sourceOutput"></pre>
   <div class="dialog-actions">
-   <button class="secondary" id="runCode" type="button">Open Source</button>
+   <button class="secondary" id="runCode" type="button">Run Code</button>
    <button class="secondary" id="fullScreen" type="button">Full Screen</button>
    <button class="secondary" id="copySource" type="button">Copy</button>
    <button class="secondary" id="exitSchool" type="button">Exit</button>
@@ -168,18 +171,19 @@ document.getElementById('runCode').addEventListener('click',()=>{
  const source=document.getElementById('sourceOutput').textContent;
  const status=document.getElementById('sourceError');
  if(!source.trim()){status.textContent='Load source code first.';return}
+ // Open a fresh tab and execute the loaded HTML there.
  const tab=window.open('about:blank','_blank');
- if(!tab){status.textContent='Allow pop-ups to open the source tab.';return}
- const d=tab.document;
- d.title='Source Code';
- const font=d.createElement('link');font.rel='stylesheet';font.href='https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600&display=swap';
- const style=d.createElement('style');style.textContent='*{box-sizing:border-box}body{margin:0;padding:24px;background:#080808;color:#fff;font-family:Fredoka,sans-serif}header{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}h1{font-size:22px;font-weight:500}button{font:inherit;background:#ff9f0a;color:#111;border:0;border-radius:10px;padding:10px 15px}pre{white-space:pre;overflow:auto;padding:20px;background:#111;border:1px solid #333;border-radius:14px;min-height:85vh;font:14px/1.6 Fredoka,sans-serif}';
- d.head.append(font,style);
- const header=d.createElement('header'),title=d.createElement('h1'),copy=d.createElement('button'),pre=d.createElement('pre');
- title.textContent='Source Code';copy.textContent='Copy Source';copy.type='button';pre.textContent=source;
- header.append(title,copy);d.body.append(header,pre);
- copy.onclick=()=>{pre.focus();const r=d.createRange();r.selectNodeContents(pre);const s=tab.getSelection();s.removeAllRanges();s.addRange(r);copy.textContent='Source Selected'};
- tab.focus();status.textContent='Source opened in a new tab.';
+ if(!tab){status.textContent='Allow pop-ups to run the source in a new tab.';return}
+ try{
+  tab.document.open();
+  tab.document.write(source);
+  tab.document.close();
+  tab.focus();
+  status.textContent='Source is running in a new tab. Only run code from websites you trust.';
+ }catch(err){
+  tab.close();
+  status.textContent='The source could not be started in a new tab.';
+ }
 });
 
 document.getElementById('fullScreen').addEventListener('click',async()=>{
