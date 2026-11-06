@@ -45,12 +45,21 @@ button{cursor:pointer}
 .url-row input,.url-row select{min-width:0;background:#050505;color:white;border:1px solid #393939;border-radius:11px;padding:12px;font-family:"Fredoka",sans-serif}.url-row input{flex:1}.preset-row{display:flex;gap:8px;margin-top:10px}.preset-row select{flex:1;min-width:0;background:#050505;color:#fff;border:1px solid #393939;border-radius:11px;padding:12px;font-family:"Fredoka",sans-serif}.preset-row button{white-space:nowrap}.school.fullscreen .preset-row{flex-shrink:0}
 .primary{background:var(--orange);color:#111;border:0;border-radius:11px;padding:12px 16px;font-weight:700}
 .source{white-space:pre;overflow:auto;max-height:48dvh;background:#050505;border:1px solid #333;border-radius:12px;padding:14px;font:12px/1.5 "Fredoka",sans-serif;color:#ddd;margin-top:14px;tab-size:2}
+#acCounter{position:absolute;top:10px;left:12px;color:#ff9f0a;font-size:12px;letter-spacing:.5px;display:none}.display{position:relative}
+body.light-mode,body.light-mode .overlay{background:#f4f4f4;color:#111}
+body.light-mode .key{background:#dedede;color:#111}
+body.light-mode .utility{background:#bcbcbc;color:#111}
+body.light-mode .operator{background:#ff9f0a;color:#fff}
+body.light-mode .dialog{background:#fff;color:#111;border-color:#ccc}
+body.light-mode .dialog p{color:#555}
+body.light-mode .source{background:#f4f4f4;color:#222;border-color:#ccc}
+body.light-mode .url-row input,body.light-mode .url-row select,body.light-mode .preset-row select{background:#fff;color:#111;border-color:#ccc}
 @media(min-width:500px){.calculator{width:360px}.keys{gap:12px}.key{font-size:28px}}
 </style>
 </head>
 <body>
 <main class="calculator" aria-label="Calculator">
-  <div class="display"><output id="screen" aria-live="polite">0</output></div>
+  <div class="display"><span id="acCounter"></span><output id="screen" aria-live="polite">0</output></div>
   <div class="keys" id="keys">
     <button class="key utility" id="clearKey" data-action="clear">AC</button>
     <button class="key utility" data-action="sign">+/−</button>
@@ -122,17 +131,27 @@ button{cursor:pointer}
  </div>
 </section>
 
+<section class="overlay" id="instructionsOverlay" role="dialog" aria-modal="true" aria-labelledby="instructionsTitle">
+ <div class="dialog">
+  <h1 id="instructionsTitle">You found the hidden light mode!</h1>
+  <p>The calculator is now in light mode. Your secret sequence is complete.</p>
+  <p><strong>Calculator instructions</strong></p>
+  <p>Tap AC to clear the current calculation. Use the number keys to enter values, the orange keys to choose an operation, and = to calculate the answer. Tap the button below whenever you want to return to dark mode.</p>
+  <div class="dialog-actions"><button class="primary" id="toggleTheme" type="button">Switch to dark mode</button><button class="secondary" id="closeInstructions" type="button">Close</button></div>
+ </div>
+</section>
+
 <script>
 (()=>{
 const screen=document.getElementById('screen'),keys=document.getElementById('keys');
 let value='0',stored=null,op=null,waiting=false,done=false;
 const fmt=n=>Number.isFinite(n)?String(Number(n.toPrecision(11))):'Error';
 function draw(){let s=value;if(s.length>11&&s!=='Error')s=Number(s).toExponential(5);screen.textContent=s;keys.querySelectorAll('[data-op]').forEach(b=>b.classList.toggle('selected',waiting&&b.dataset.op===op))}
-function digit(d){if(value==='Error'||waiting||done){value=d;waiting=false;done=false}else if(value.replace('-','').length<14)value=value==='0'?d:value+d;draw()}
+function digit(d){if(secretDigit(d))return;if(value==='Error'||waiting||done){value=d;waiting=false;done=false}else if(value.replace('-','').length<14)value=value==='0'?d:value+d;draw()}
 function decimal(){if(value==='Error'||waiting||done){value='0.';waiting=false;done=false}else if(!value.includes('.'))value+='.';draw()}
 function calc(a,b,o){return o==='+'?a+b:o==='−'?a-b:o==='×'?a*b:o==='÷'?(b===0?NaN:a/b):b}
 function choose(o){let n=Number(value);if(!Number.isFinite(n))return;if(op&&!waiting){stored=calc(stored,n,op);value=fmt(stored)}else stored=n;op=o;waiting=true;done=false;draw()}
-function equal(){if(!op||stored===null||waiting)return;value=fmt(calc(stored,Number(value),op));stored=null;op=null;waiting=true;done=true;draw()}
+function equal(){if(secretEquals())return;if(!op||stored===null||waiting)return;value=fmt(calc(stored,Number(value),op));stored=null;op=null;waiting=true;done=true;draw()}
 function action(a){if(a==='clear'){value='0';stored=null;op=null;waiting=false;done=false}
 else if(a==='sign'&&value!=='0'&&value!=='Error')value=value.startsWith('-')?value.slice(1):'-'+value;
 else if(a==='percent'&&value!=='Error')value=fmt(Number(value)/100);
@@ -143,34 +162,59 @@ keys.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)retur
 document.addEventListener('keydown',e=>{if(document.getElementById('codeOverlay').classList.contains('open')){if(/^[0-9]$/.test(e.key))addCode(e.key);else if(e.key==='Backspace')addCode('back');else if(e.key==='Enter')unlock();else if(e.key==='Escape')closeCode();return}if(/^[0-9]$/.test(e.key))digit(e.key);else if(e.key==='.'||e.key===',')decimal();else if(e.key==='Enter'||e.key==='='){e.preventDefault();equal()}else if(e.key==='Escape'||e.key==='Delete')action('clear');else if(e.key==='Backspace')action('backspace');else if(({'+':1,'-':1,'*':1,'/':1})[e.key])choose(({'+':'+','-':'−','*':'×','/':'÷'})[e.key]);else if(e.key==='%')action('percent')});
 draw();
 
-// Secret access sequence: tap AC three times, then tap all four screen corners.
-const clearKey=document.getElementById('clearKey'),codeOverlay=document.getElementById('codeOverlay');
-let code='',acTaps=0,lastAcTap=0,cornerStage=false;
-const tappedCorners=new Set();
-function openCode(){code='';updateCode();document.getElementById('codeError').textContent='';codeOverlay.classList.add('open')}
-function closeCode(){codeOverlay.classList.remove('open');code='';updateCode()}
-function updateCode(){document.getElementById('codeDisplay').textContent=code.padEnd(4,'•').split('').join(' ')}
-function addCode(v){if(v==='clear')code='';else if(v==='back')code=code.slice(0,-1);else if(code.length<4)code+=v;updateCode();if(code.length===4)unlock()}
-function unlock(){if(code==='0000'){closeCode();document.getElementById('schoolOverlay').classList.add('open');document.getElementById('siteUrl').focus()}else{document.getElementById('codeError').textContent='Incorrect code. Try again.';code='';updateCode()}}
-clearKey.addEventListener('click',()=>{
+// Hidden unlock sequence: 10 AC taps in 10 seconds, then 100 additional AC taps,
+// five equals taps, enter 1000, then rapidly tap 6-7 eight times.
+const clearKey=document.getElementById('clearKey');
+const acCounter=document.getElementById('acCounter');
+let acWarmup=0,acWarmupStart=0,acCount=0,secretStage='idle';
+let equalsCount=0,secretNumber='',patternIndex=0,patternStarted=0;
+function showSecretCounter(){acCounter.style.display=secretStage==='count'?'block':'none';if(secretStage==='count')acCounter.textContent='AC COUNT  '+acCount+' / 100';}
+function handleAcTap(){
  const now=Date.now();
- if(now-lastAcTap>5000)acTaps=0;
- lastAcTap=now;
- acTaps++;
- action('clear');
- if(acTaps>=3){acTaps=0;cornerStage=true;tappedCorners.clear()}
+ if(secretStage==='idle'){
+  if(!acWarmup||now-acWarmupStart>10000){acWarmup=0;acWarmupStart=now}
+  acWarmup++;
+  if(acWarmup>=10){secretStage='count';acCount=0;showSecretCounter();screen.textContent='0';}
+ }else if(secretStage==='count'){
+  acCount++;showSecretCounter();
+  if(acCount>=100){secretStage='equals';acCounter.textContent='NEXT: TAP = 5 TIMES';screen.textContent='100';}
+ }
+}
+function secretDigit(d){
+ if(secretStage==='enter1000'){
+  secretNumber+=d;screen.textContent=secretNumber||'0';
+  if(secretNumber.length>=4){
+   if(secretNumber==='1000'){secretStage='pattern';patternIndex=0;patternStarted=Date.now();screen.textContent='6-7-6-7';acCounter.style.display='block';acCounter.textContent='NOW TAP 6 AND 7 QUICKLY';}
+   else{secretNumber='';screen.textContent='TRY 1000';}
+  }
+  return true;
+ }
+ if(secretStage==='pattern'){
+  const expected=patternIndex%2===0?'6':'7';
+  if(Date.now()-patternStarted>8000||d!==expected){patternIndex=0;patternStarted=Date.now();acCounter.textContent='SEQUENCE RESET — 6 THEN 7';return true;}
+  patternIndex++;
+  if(patternIndex>=16){
+   secretStage='done';document.body.classList.add('light-mode');acCounter.style.display='none';
+   document.getElementById('instructionsOverlay').classList.add('open');
+  }
+  return true;
+ }
+ return false;
+}
+function secretEquals(){
+ if(secretStage==='equals'){
+  equalsCount++;screen.textContent='= '+equalsCount+'/5';
+  if(equalsCount>=5){secretStage='enter1000';secretNumber='';screen.textContent='ENTER 1000';acCounter.style.display='block';acCounter.textContent='TYPE 1000';}
+  return true;
+ }
+ return false;
+}
+clearKey.addEventListener('click',handleAcTap);
+document.getElementById('toggleTheme').addEventListener('click',()=>{
+ document.body.classList.remove('light-mode');
+ document.getElementById('instructionsOverlay').classList.remove('open');
 });
-document.addEventListener('pointerdown',e=>{
- if(!cornerStage||codeOverlay.classList.contains('open')||document.getElementById('schoolOverlay').classList.contains('open'))return;
- const margin=44,x=e.clientX,y=e.clientY,w=window.innerWidth,h=window.innerHeight;
- let corner=null;
- if(x<=margin&&y<=margin)corner='top-left';
- else if(x>=w-margin&&y<=margin)corner='top-right';
- else if(x<=margin&&y>=h-margin)corner='bottom-left';
- else if(x>=w-margin&&y>=h-margin)corner='bottom-right';
- if(corner)tappedCorners.add(corner);
- if(tappedCorners.size===4){cornerStage=false;tappedCorners.clear();openCode()}
-},true);
+document.getElementById('closeInstructions').addEventListener('click',()=>document.getElementById('instructionsOverlay').classList.remove('open'));
 document.getElementById('codeKeys').addEventListener('click',e=>{const b=e.target.closest('button');if(b)addCode(b.dataset.code)});
 document.getElementById('submitCode').addEventListener('click',unlock);
 document.getElementById('cancelCode').addEventListener('click',closeCode);
