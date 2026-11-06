@@ -37,9 +37,6 @@ button{cursor:pointer}
 .error{color:#ff7777!important;min-height:18px}
 .school{width:min(100%,900px)}
 .school.fullscreen{position:fixed;inset:0;width:100%;height:100dvh;max-height:none;border-radius:0;display:flex;flex-direction:column}
-.preview{display:none;width:100%;height:42dvh;min-height:220px;border:1px solid #333;border-radius:12px;background:#fff;margin-top:12px}
-.preview.visible{display:block}
-.school.fullscreen .preview{flex:1;height:auto;min-height:0}
 .school.fullscreen .source{max-height:24dvh}
 .url-row{display:flex;gap:8px}
 .url-row input{flex:1;min-width:0;background:#050505;color:white;border:1px solid #393939;border-radius:11px;padding:12px}
@@ -88,7 +85,6 @@ button{cursor:pointer}
   </form>
   <p class="error" id="sourceError" style="margin-top:12px"></p>
   <pre class="source" id="sourceOutput"></pre>
-  <iframe class="preview" id="codePreview" title="Code preview" sandbox="allow-scripts allow-forms allow-modals allow-pointer-lock"></iframe>
   <div class="dialog-actions">
    <button class="secondary" id="runCode" type="button">Run Code</button>
    <button class="secondary" id="fullScreen" type="button">Full Screen</button>
@@ -136,7 +132,7 @@ document.getElementById('cancelCode').addEventListener('click',closeCode);
 document.getElementById('exitSchool').addEventListener('click',()=>document.getElementById('schoolOverlay').classList.remove('open'));
 document.getElementById('sourceForm').addEventListener('submit',async e=>{
  e.preventDefault();
- const input=document.getElementById('siteUrl'),error=document.getElementById('sourceError'),output=document.getElementById('sourceOutput'),button=document.getElementById('loadSource'),frame=document.getElementById('codePreview');
+ const input=document.getElementById('siteUrl'),error=document.getElementById('sourceError'),output=document.getElementById('sourceOutput'),button=document.getElementById('loadSource');
  let url;
  try{
   const raw=input.value.trim();
@@ -145,33 +141,37 @@ document.getElementById('sourceForm').addEventListener('submit',async e=>{
   if(!['http:','https:'].includes(url.protocol))throw new Error();
  }catch{error.textContent='Check the web address and try again.';return}
  error.textContent='';
- output.textContent='';
- frame.src=url.href;
- frame.classList.add('visible');
+ output.textContent='Loading source code…';
  button.disabled=true;button.textContent='Loading';
  try{
-  const response=await fetch(url.href,{method:'GET',mode:'cors',credentials:'omit',redirect:'follow'});
-  if(!response.ok)throw new Error();
-  output.textContent=await response.text();
-  error.textContent='Page loaded. Source is available below.';
- }catch{
-  error.textContent='Page requested in preview. This site does not allow its source to be read by this browser.';
+  let source='';
+  try{
+   const direct=await fetch(url.href,{method:'GET',mode:'cors',credentials:'omit',redirect:'follow'});
+   if(!direct.ok)throw new Error('Direct request blocked');
+   source=await direct.text();
+  }catch(directError){
+   const proxy='https://api.allorigins.win/raw?url='+encodeURIComponent(url.href);
+   const proxied=await fetch(proxy,{method:'GET',mode:'cors',credentials:'omit'});
+   if(!proxied.ok)throw new Error('Source proxy unavailable');
+   source=await proxied.text();
+  }
+  if(!source.trim())throw new Error('Empty response');
+  output.textContent=source;
+  error.textContent='Source code loaded.';
+ }catch(err){
+  output.textContent='';
+  error.textContent='This website did not provide readable source. It may require sign-in, block proxy requests, or be protected by its server.';
  }finally{button.disabled=false;button.textContent='Load'}
 });
 
 document.getElementById('runCode').addEventListener('click',()=>{
  const source=document.getElementById('sourceOutput').textContent;
- const frame=document.getElementById('codePreview');
- if(source.trim()){
-  frame.srcdoc=source;
-  frame.classList.add('visible');
-  document.getElementById('sourceError').textContent='';
- }else if(frame.src){
-  frame.classList.add('visible');
-  document.getElementById('sourceError').textContent='Showing the website preview. Its source is protected, so it cannot be run as editable code here.';
- }else{
-  document.getElementById('sourceError').textContent='Load a website first.';
- }
+ if(!source.trim()){document.getElementById('sourceError').textContent='Load source code first.';return}
+ const blob=new Blob([source],{type:'text/html;charset=utf-8'});
+ const runUrl=URL.createObjectURL(blob);
+ const opened=window.open(runUrl,'_blank','noopener');
+ if(!opened)document.getElementById('sourceError').textContent='Allow pop-ups to run the loaded code in a new tab.';
+ else document.getElementById('sourceError').textContent='Code opened in a new tab.';
 });
 
 document.getElementById('fullScreen').addEventListener('click',async()=>{
