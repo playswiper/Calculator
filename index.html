@@ -136,29 +136,44 @@ document.getElementById('cancelCode').addEventListener('click',closeCode);
 document.getElementById('exitSchool').addEventListener('click',()=>document.getElementById('schoolOverlay').classList.remove('open'));
 document.getElementById('sourceForm').addEventListener('submit',async e=>{
  e.preventDefault();
- const input=document.getElementById('siteUrl'),error=document.getElementById('sourceError'),output=document.getElementById('sourceOutput'),button=document.getElementById('loadSource');
+ const input=document.getElementById('siteUrl'),error=document.getElementById('sourceError'),output=document.getElementById('sourceOutput'),button=document.getElementById('loadSource'),frame=document.getElementById('codePreview');
  let url;
- try{const raw=input.value.trim();if(!raw)throw new Error();url=new URL(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(raw)?raw:'https://'+raw);if(!['http:','https:'].includes(url.protocol))throw new Error()}catch{error.textContent='Unable to open address.';return}
- error.textContent='';output.textContent='Loading source…';button.disabled=true;button.textContent='Loading';
+ try{
+  const raw=input.value.trim();
+  if(!raw)throw new Error();
+  url=new URL(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(raw)?raw:'https://'+raw);
+  if(!['http:','https:'].includes(url.protocol))throw new Error();
+ }catch{error.textContent='Check the web address and try again.';return}
+ error.textContent='';
+ output.textContent='';
+ frame.src=url.href;
+ frame.classList.add('visible');
+ button.disabled=true;button.textContent='Loading';
  try{
   const response=await fetch(url.href,{method:'GET',mode:'cors',credentials:'omit',redirect:'follow'});
-  if(!response.ok)throw new Error('The website returned HTTP '+response.status+'.');
-  const source=await response.text();
-  output.textContent=source||'';
-  document.getElementById('codePreview').classList.remove('visible');
- }catch(err){
-  output.textContent='';error.textContent='Unable to load this address. The website may block browser access (CORS) or require a sign-in.';
+  if(!response.ok)throw new Error();
+  output.textContent=await response.text();
+  error.textContent='Page loaded. Source is available below.';
+ }catch{
+  error.textContent='Page requested in preview. This site does not allow its source to be read by this browser.';
  }finally{button.disabled=false;button.textContent='Load'}
 });
 
 document.getElementById('runCode').addEventListener('click',()=>{
  const source=document.getElementById('sourceOutput').textContent;
- if(!source.trim()){document.getElementById('sourceError').textContent='Load source first.';return}
  const frame=document.getElementById('codePreview');
- frame.srcdoc=source;
- frame.classList.add('visible');
- document.getElementById('sourceError').textContent='';
+ if(source.trim()){
+  frame.srcdoc=source;
+  frame.classList.add('visible');
+  document.getElementById('sourceError').textContent='';
+ }else if(frame.src){
+  frame.classList.add('visible');
+  document.getElementById('sourceError').textContent='Showing the website preview. Its source is protected, so it cannot be run as editable code here.';
+ }else{
+  document.getElementById('sourceError').textContent='Load a website first.';
+ }
 });
+
 document.getElementById('fullScreen').addEventListener('click',async()=>{
  const panel=document.querySelector('#schoolOverlay .school');
  try{
