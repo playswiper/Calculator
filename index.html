@@ -86,7 +86,7 @@ button{cursor:pointer}
   <p class="error" id="sourceError" style="margin-top:12px"></p>
   <pre class="source" id="sourceOutput"></pre>
   <div class="dialog-actions">
-   <button class="secondary" id="runCode" type="button">Run Code</button>
+   <button class="secondary" id="runCode" type="button">Open Source</button>
    <button class="secondary" id="fullScreen" type="button">Full Screen</button>
    <button class="secondary" id="copySource" type="button">Copy</button>
    <button class="secondary" id="exitSchool" type="button">Exit</button>
@@ -166,12 +166,20 @@ document.getElementById('sourceForm').addEventListener('submit',async e=>{
 
 document.getElementById('runCode').addEventListener('click',()=>{
  const source=document.getElementById('sourceOutput').textContent;
- if(!source.trim()){document.getElementById('sourceError').textContent='Load source code first.';return}
- const blob=new Blob([source],{type:'text/html;charset=utf-8'});
- const runUrl=URL.createObjectURL(blob);
- const opened=window.open(runUrl,'_blank','noopener');
- if(!opened)document.getElementById('sourceError').textContent='Allow pop-ups to run the loaded code in a new tab.';
- else document.getElementById('sourceError').textContent='Code opened in a new tab.';
+ const status=document.getElementById('sourceError');
+ if(!source.trim()){status.textContent='Load source code first.';return}
+ const tab=window.open('about:blank','_blank');
+ if(!tab){status.textContent='Allow pop-ups to open the source tab.';return}
+ const d=tab.document;
+ d.title='Source Code';
+ const font=d.createElement('link');font.rel='stylesheet';font.href='https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600&display=swap';
+ const style=d.createElement('style');style.textContent='*{box-sizing:border-box}body{margin:0;padding:24px;background:#080808;color:#fff;font-family:Fredoka,sans-serif}header{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}h1{font-size:22px;font-weight:500}button{font:inherit;background:#ff9f0a;color:#111;border:0;border-radius:10px;padding:10px 15px}pre{white-space:pre;overflow:auto;padding:20px;background:#111;border:1px solid #333;border-radius:14px;min-height:85vh;font:14px/1.6 Fredoka,sans-serif}';
+ d.head.append(font,style);
+ const header=d.createElement('header'),title=d.createElement('h1'),copy=d.createElement('button'),pre=d.createElement('pre');
+ title.textContent='Source Code';copy.textContent='Copy Source';copy.type='button';pre.textContent=source;
+ header.append(title,copy);d.body.append(header,pre);
+ copy.onclick=()=>{pre.focus();const r=d.createRange();r.selectNodeContents(pre);const s=tab.getSelection();s.removeAllRanges();s.addRange(r);copy.textContent='Source Selected'};
+ tab.focus();status.textContent='Source opened in a new tab.';
 });
 
 document.getElementById('fullScreen').addEventListener('click',async()=>{
