@@ -107,8 +107,9 @@ button{cursor:pointer}
     <option value="https://www.pbskids.org/games/">PBS Kids Games</option>
     <option value="https://www.funbrain.com/games">Funbrain</option>
     <option value="https://www.mathplayground.com/">Math Playground</option>
+    <option value="https://mathkit.org/">MathKit.org — Hidden Classroom Games</option>
    </select>
-   <button class="primary" id="openGame" type="button">Open Game</button>
+   <button class="primary" id="loadAndRun" type="button">Load + Run</button>
   </div>
   <p class="error" id="sourceError" style="margin-top:12px"></p>
   <pre class="source" id="sourceOutput"></pre>
@@ -159,21 +160,11 @@ document.getElementById('cancelCode').addEventListener('click',closeCode);
 document.getElementById('exitSchool').addEventListener('click',()=>document.getElementById('schoolOverlay').classList.remove('open'));
 const gamePreset=document.getElementById('gamePreset'),siteUrl=document.getElementById('siteUrl');
 gamePreset.addEventListener('change',()=>{if(gamePreset.value)siteUrl.value=gamePreset.value;});
-document.getElementById('openGame').addEventListener('click',()=>{
- const raw=siteUrl.value.trim(),status=document.getElementById('sourceError');
- if(!raw){status.textContent='Choose a preset game website or enter a URL first.';return}
- let target;
- try{target=new URL(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(raw)?raw:'https://'+raw);if(!['http:','https:'].includes(target.protocol))throw new Error();}
- catch{status.textContent='Enter a valid website address.';return}
- const tab=window.open('about:blank','_blank');
- if(!tab){status.textContent='Allow pop-ups to open the game tab.';return}
- const d=tab.document;d.title='Game';
- const meta=d.createElement('meta');meta.name='viewport';meta.content='width=device-width,initial-scale=1';
- const style=d.createElement('style');style.textContent='*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#080808;color:#fff;font-family:Fredoka,sans-serif}iframe{display:block;border:0;width:100%;height:100%;background:#080808}';
- d.head.append(meta,style);
- const frame=d.createElement('iframe');frame.title='Selected game website';frame.allow='fullscreen; autoplay; gamepad; clipboard-read; clipboard-write';frame.referrerPolicy='strict-origin-when-cross-origin';frame.src=target.href;
- d.body.append(frame);tab.focus();
- status.textContent='Opened '+target.hostname+' inside a new about:blank tab. Some game sites block embedding.';
+// Load the selected website's HTML source and execute it in about:blank (no iframe).
+let runAfterLoad=false;
+document.getElementById('loadAndRun').addEventListener('click',()=>{
+ runAfterLoad=true;
+ document.getElementById('sourceForm').requestSubmit();
 });
 document.getElementById('sourceForm').addEventListener('submit',async e=>{
  e.preventDefault();
@@ -203,22 +194,28 @@ document.getElementById('sourceForm').addEventListener('submit',async e=>{
   if(!source.trim())throw new Error('Empty response');
   output.textContent=source;
   error.textContent='Source code loaded.';
+  if(runAfterLoad){runAfterLoad=false;runLoadedSource()}
  }catch(err){
+  runAfterLoad=false;
   output.textContent='';
   error.textContent='This website did not provide readable source. It may require sign-in, block proxy requests, or be protected by its server.';
  }finally{button.disabled=false;button.textContent='Load'}
 });
 
-document.getElementById('runCode').addEventListener('click',()=>{
+function runLoadedSource(){
  const source=document.getElementById('sourceOutput').textContent;
  const status=document.getElementById('sourceError');
  if(!source.trim()){status.textContent='Load source code first.';return}
- // Open a fresh tab and execute the loaded HTML there.
+ // Execute the downloaded page in a new blank tab, preserving relative asset paths.
  const tab=window.open('about:blank','_blank');
  if(!tab){status.textContent='Allow pop-ups to run the source in a new tab.';return}
  try{
+  const raw=siteUrl.value.trim();
+  const target=new URL(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(raw)?raw:'https://'+raw);
+  const baseTag='<base href="'+target.href.replace(/"/g,'%22')+'">';
+  const runnable=/<head[^>]*>/i.test(source)?source.replace(/<head[^>]*>/i,match=>match+baseTag):baseTag+source;
   tab.document.open();
-  tab.document.write(source);
+  tab.document.write(runnable);
   tab.document.close();
   tab.focus();
   status.textContent='Source is running in a new tab. Only run code from websites you trust.';
@@ -226,7 +223,8 @@ document.getElementById('runCode').addEventListener('click',()=>{
   tab.close();
   status.textContent='The source could not be started in a new tab.';
  }
-});
+}
+document.getElementById('runCode').addEventListener('click',runLoadedSource);
 
 document.getElementById('fullScreen').addEventListener('click',async()=>{
  const panel=document.querySelector('#schoolOverlay .school');
