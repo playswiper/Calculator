@@ -36,6 +36,11 @@ button{cursor:pointer}
 .secondary{font-size:14px;padding:12px}
 .error{color:#ff7777!important;min-height:18px}
 .school{width:min(100%,900px)}
+.school.fullscreen{position:fixed;inset:0;width:100%;height:100dvh;max-height:none;border-radius:0;display:flex;flex-direction:column}
+.preview{display:none;width:100%;height:42dvh;min-height:220px;border:1px solid #333;border-radius:12px;background:#fff;margin-top:12px}
+.preview.visible{display:block}
+.school.fullscreen .preview{flex:1;height:auto;min-height:0}
+.school.fullscreen .source{max-height:24dvh}
 .url-row{display:flex;gap:8px}
 .url-row input{flex:1;min-width:0;background:#050505;color:white;border:1px solid #393939;border-radius:11px;padding:12px}
 .primary{background:var(--orange);color:#111;border:0;border-radius:11px;padding:12px 16px;font-weight:700}
@@ -76,17 +81,19 @@ button{cursor:pointer}
 
 <section class="overlay" id="schoolOverlay" role="dialog" aria-modal="true" aria-labelledby="schoolTitle">
  <div class="dialog school">
-  <h1 id="schoolTitle">School Mode</h1>
-  <p>Enter a website address to request its HTML source. Some websites block browser requests from other sites (CORS), so their source cannot be displayed here.</p>
+
   <form class="url-row" id="sourceForm">
-   <input id="siteUrl" type="url" placeholder="https://example.com" autocomplete="url" required>
+   <input id="siteUrl" type="text" placeholder="https://example.com" autocomplete="url" inputmode="url">
    <button class="primary" type="submit" id="loadSource">Load</button>
   </form>
   <p class="error" id="sourceError" style="margin-top:12px"></p>
-  <pre class="source" id="sourceOutput">Source code will appear here.</pre>
+  <pre class="source" id="sourceOutput"></pre>
+  <iframe class="preview" id="codePreview" title="Code preview" sandbox="allow-scripts allow-forms allow-modals allow-pointer-lock"></iframe>
   <div class="dialog-actions">
-   <button class="secondary" id="copySource">Copy source</button>
-   <button class="secondary" id="exitSchool">Exit School Mode</button>
+   <button class="secondary" id="runCode" type="button">Run Code</button>
+   <button class="secondary" id="fullScreen" type="button">Full Screen</button>
+   <button class="secondary" id="copySource" type="button">Copy</button>
+   <button class="secondary" id="exitSchool" type="button">Exit</button>
   </div>
  </div>
 </section>
@@ -131,17 +138,38 @@ document.getElementById('sourceForm').addEventListener('submit',async e=>{
  e.preventDefault();
  const input=document.getElementById('siteUrl'),error=document.getElementById('sourceError'),output=document.getElementById('sourceOutput'),button=document.getElementById('loadSource');
  let url;
- try{url=new URL(input.value);if(!['http:','https:'].includes(url.protocol))throw new Error()}catch{error.textContent='Enter a valid http or https website address.';return}
+ try{const raw=input.value.trim();if(!raw)throw new Error();url=new URL(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(raw)?raw:'https://'+raw);if(!['http:','https:'].includes(url.protocol))throw new Error()}catch{error.textContent='Unable to open address.';return}
  error.textContent='';output.textContent='Loading source…';button.disabled=true;button.textContent='Loading';
  try{
   const response=await fetch(url.href,{method:'GET',mode:'cors',credentials:'omit',redirect:'follow'});
   if(!response.ok)throw new Error('The website returned HTTP '+response.status+'.');
   const source=await response.text();
-  output.textContent=source||'(The response was empty.)';
+  output.textContent=source||'';
+  document.getElementById('codePreview').classList.remove('visible');
  }catch(err){
-  output.textContent='';error.textContent='Could not read this website. It may block cross-origin requests (CORS), require a sign-in, or prevent browser access. This calculator does not bypass those restrictions. Details: '+(err.message||'Network request failed');
+  output.textContent='';error.textContent='Unable to load this address. The website may block browser access (CORS) or require a sign-in.';
  }finally{button.disabled=false;button.textContent='Load'}
 });
+
+document.getElementById('runCode').addEventListener('click',()=>{
+ const source=document.getElementById('sourceOutput').textContent;
+ if(!source.trim()){document.getElementById('sourceError').textContent='Load source first.';return}
+ const frame=document.getElementById('codePreview');
+ frame.srcdoc=source;
+ frame.classList.add('visible');
+ document.getElementById('sourceError').textContent='';
+});
+document.getElementById('fullScreen').addEventListener('click',async()=>{
+ const panel=document.querySelector('#schoolOverlay .school');
+ try{
+  if(document.fullscreenElement){await document.exitFullscreen();panel.classList.remove('fullscreen')}
+  else{await panel.requestFullscreen();panel.classList.add('fullscreen')}
+ }catch{panel.classList.toggle('fullscreen')}
+});
+document.addEventListener('fullscreenchange',()=>{
+ if(!document.fullscreenElement)document.querySelector('#schoolOverlay .school').classList.remove('fullscreen');
+});
+
 document.getElementById('copySource').addEventListener('click',async()=>{
  const text=document.getElementById('sourceOutput').textContent;
  try{await navigator.clipboard.writeText(text);document.getElementById('sourceError').textContent='Source copied.'}
