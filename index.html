@@ -252,11 +252,11 @@ async function loadWebsiteInViewer(rawUrl){
   target=new URL(rawUrl);
   if(target.protocol!=='https:')throw new Error('For safety, enter a website beginning with https://');
  }catch(error){
-  $('customSiteError').textContent=error.message||'Enter a valid website address.';
+  showViewerError('Invalid website address',error.message||'Enter a valid HTTPS website address.');
   return;
  }
  currentViewerUrl=target.href;
- $('customSiteError')?.textContent='';
+ 
  $('viewerOverlay').classList.add('open');
 $('viewerError').classList.remove('show');
  $('viewerFrame').srcdoc='';
@@ -285,13 +285,7 @@ $('viewerError').classList.remove('show');
   // The full-screen error overlay explains why the page could not be loaded.
  }
 }
-document.querySelectorAll('[data-site]').forEach(button=>{
- button.addEventListener('click',()=>{
-  $('schoolOverlay').classList.remove('open');
-  openSiteInBlank(button.dataset.site);
- });
-});
-$('exitSchool').addEventListener('click',()=>$('schoolOverlay').classList.remove('open'));
+
 
 
 render();
