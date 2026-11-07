@@ -323,7 +323,7 @@ function button(txt,fn,cls){const b=document.createElement('button');b.className
 function start(){clearInterval(timer);running=true;points(0);area.innerHTML='';status.textContent=G.goal;$('start').textContent='Restart';
 if(G.type==='idle')idle();else if(G.type==='slots')slots();else if(G.type==='reaction')reaction();else if(G.type==='memory')memory();else if(G.type==='math')math();else if(G.type==='whack')whack();else if(G.type==='typing')typing();else if(G.type==='runner')runner();else if(G.type==='dodge')dodge();else puzzle();}
 function idle(){
-let cash=0,owned=[0,0,0,0,0,0],clickPower=1,multiplier=1,prestige=0,golden=0;
+let cash=0,owned=[0,0,0,0,0,0],clickPower=1,multiplier=1,prestige=0,golden=0,upgradeBought=[false,false,false,false];
 const items=[
 {name:'Helpful friend',emoji:'🧑‍🍳',base:15,rate:.2},
 {name:'Cookie oven',emoji:'🔥',base:100,rate:1},
@@ -340,7 +340,7 @@ const upgrades=[
 ];
 try{
 const s=JSON.parse(localStorage.getItem('arcade-'+G.id+'-save'));
-if(s){cash=Number(s.cash)||0;owned=Array.isArray(s.owned)?s.owned.slice(0,6):owned;while(owned.length<6)owned.push(0);clickPower=Number(s.clickPower)||1;multiplier=Number(s.multiplier)||1;prestige=Number(s.prestige)||0;const elapsed=Math.min(8*60*60,Math.max(0,(Date.now()-(Number(s.savedAt)||Date.now()))/1000));cash+=elapsed*owned.reduce((n,v,i)=>n+v*items[i].rate,0)*multiplier*.35;}}
+if(s){cash=Number(s.cash)||0;owned=Array.isArray(s.owned)?s.owned.slice(0,6):owned;while(owned.length<6)owned.push(0);clickPower=Number(s.clickPower)||1;multiplier=Number(s.multiplier)||1;prestige=Number(s.prestige)||0;upgradeBought=Array.isArray(s.upgradeBought)?s.upgradeBought.slice(0,4):upgradeBought;const elapsed=Math.min(8*60*60,Math.max(0,(Date.now()-(Number(s.savedAt)||Date.now()))/1000));cash+=elapsed*owned.reduce((n,v,i)=>n+v*items[i].rate,0)*multiplier*.35;}}
 catch{}
 const stats=document.createElement('div');stats.className='stats';
 stats.innerHTML='<div><b id="cash">0</b><small>'+G.name+' points</small></div><div><b id="rate">0</b><small>Per second</small></div><div><b id="click">1</b><small>Per tap</small></div><div><b id="prestige">0</b><small>Prestige stars</small></div>';
@@ -350,7 +350,7 @@ const research=document.createElement('div');research.className='shop';
 const goldenButton=button('✨ Golden bonus',()=>{if(!golden)return;cash+=golden;golden=0;goldenButton.remove();draw();save();},'tap');goldenButton.style.display='none';
 function production(){return owned.reduce((s,n,i)=>s+n*items[i].rate,0)*multiplier*(1+prestige*.1);}
 function cost(i){return Math.ceil(items[i].base*Math.pow(1.17,owned[i]));}
-function save(){try{localStorage.setItem('arcade-'+G.id+'-save',JSON.stringify({cash,owned,clickPower,multiplier,prestige,savedAt:Date.now()}));}catch{}}
+function save(){try{localStorage.setItem('arcade-'+G.id+'-save',JSON.stringify({cash,owned,clickPower,multiplier,prestige,upgradeBought,savedAt:Date.now()}));}catch{}}
 function draw(){
 $('cash').textContent=Math.floor(cash).toLocaleString();
 $('rate').textContent=production().toFixed(1);
@@ -365,9 +365,9 @@ b.disabled=cash<c;shop.appendChild(b);
 });
 research.innerHTML='';
 upgrades.forEach((u,i)=>{
-const bought=!!(window['__arcadeUpgrade_'+G.id+'_'+i]);
+const bought=!!upgradeBought[i];
 const b=button((bought?'✓ ':'🔧 ')+u.name+' — '+u.cost,()=>{
-if(bought||cash<u.cost)return;cash-=u.cost;u.apply();window['__arcadeUpgrade_'+G.id+'_'+i]=true;draw();save();
+if(bought||cash<u.cost)return;cash-=u.cost;u.apply();upgradeBought[i]=true;draw();save();
 });
 b.disabled=bought||cash<u.cost;b.title=u.desc;research.appendChild(b);
 });
@@ -375,7 +375,7 @@ b.disabled=bought||cash<u.cost;b.title=u.desc;research.appendChild(b);
 area.append(stats,tap,goldenButton,shop,research);
 const prestigeButton=button('Prestige · reset for a permanent bonus',()=>{
 if(cash<1000000){status.textContent='Reach 1,000,000 points to prestige.';return;}
-if(confirm('Prestige resets your bakery but gives a permanent production bonus. Continue?')){prestige++;cash=0;owned=[0,0,0,0,0,0];clickPower=1;multiplier=1;upgrades.forEach((u,i)=>window['__arcadeUpgrade_'+G.id+'_'+i]=false);draw();save();}
+if(confirm('Prestige resets your bakery but gives a permanent production bonus. Continue?')){prestige++;cash=0;owned=[0,0,0,0,0,0];clickPower=1;multiplier=1;upgradeBought=[false,false,false,false];draw();save();}
 });
 area.appendChild(prestigeButton);
 draw();
