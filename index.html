@@ -284,15 +284,22 @@ async function loadSource(){
    ['ThingProxy','https://thingproxy.freeboard.io/fetch/'+url.href,'proxy']
   ];
   for(const [label,endpoint,kind] of attempts){
+   const controller=new AbortController();
+   const timeout=setTimeout(()=>controller.abort(new Error('Request timed out after 18 seconds')),18000);
    try{
     progress.textContent='Trying '+label+'…';
-    const candidate=await fetch(endpoint,{mode:'cors',credentials:'omit',redirect:'follow'});
+    const candidate=await fetch(endpoint,{mode:'cors',credentials:'omit',redirect:'follow',signal:controller.signal,cache:'no-store'});
     if(!candidate.ok)throw new Error('HTTP '+candidate.status);
-    response=candidate;lastBaseUrl=kind==='direct'?(candidate.url||url.href):url.href;break;
-   }catch(err){errors.push(label+': '+(err.message||'request failed'));}
+    const length=Number(candidate.headers.get('content-length'))||0;
+    if(length>8*1024*1024)throw new Error('Page is larger than the 8 MB safety limit.');
+    response=candidate;lastBaseUrl=kind==='direct'?(candidate.url||url.href):url.href;
+    window.clearTimeout(timeout);
+    break;
+   }catch(err){window.clearTimeout(timeout);controller.abort();errors.push(label+': '+(err.message||'request failed'));}
   }
   if(!response)throw new Error(errors.join(' | '));
   const source=await readWithProgress(response);
+  if(new Blob([source]).size>8*1024*1024)throw new Error('Page is larger than the 8 MB safety limit.');
   if(!source.trim())throw new Error('The server returned an empty page.');
   output.textContent=source;
   if(!lastBaseUrl)lastBaseUrl=url.href;
@@ -302,29 +309,42 @@ async function loadSource(){
   progress.textContent='';
  }finally{button.disabled=false;button.textContent='Load Source';}
 }
-function runLoadedSource(){
+async function runLoadedSource(){
  const source=$('sourceOutput').textContent,status=$('sourceError');
  if(!source.trim()){status.textContent='Load source first.';return;}
  const tab=window.open('about:blank','_blank');
  if(!tab){status.textContent='Pop-up blocked. Allow pop-ups and try again.';return;}
  try{
-  const base=new URL(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(lastBaseUrl)?lastBaseUrl:'https://'+lastBaseUrl);
-  const baseTag='<base href="'+base.href.replace(/"/g,'%22')+'">';
-  const runnable=/<head[^>]*>/i.test(source)?source.replace(/<head[^>]*>/i,m=>m+baseTag):'<!doctype html><head>'+baseTag+'</head>'+source;
-  const frame=tab.document.createElement('iframe');
-  frame.setAttribute('title','Loaded website');
-  frame.setAttribute('sandbox','allow-scripts allow-forms allow-pointer-lock allow-popups allow-downloads allow-modals allow-orientation-lock');
-  frame.setAttribute('allow','fullscreen; autoplay; gamepad; accelerometer; gyroscope; clipboard-read; clipboard-write');
-  frame.setAttribute('allowfullscreen','');
-  frame.style.cssText='position:fixed;inset:0;width:100%;height:100%;border:0;display:block;background:#fff';
-  tab.document.documentElement.style.cssText='width:100%;height:100%;margin:0;overflow:hidden;background:#000';
-  tab.document.body.style.cssText='width:100%;height:100%;margin:0;overflow:hidden;background:#000';
-  tab.document.body.replaceChildren(frame);
-  frame.srcdoc=runnable;
-  tab.document.title='Running website';
+  const baseUrl=lastBaseUrl||siteInput.value.trim();
+  const base=new URL(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(baseUrl)?baseUrl:'https://'+baseUrl);
+  const parsed=new DOMParser().parseFromString(source,'text/html');
+  const target=tab.document;
+  const root=target.documentElement;
+  for(const attr of [...parsed.documentElement.attributes])root.setAttribute(attr.name,attr.value);
+  root.innerHTML=parsed.documentElement.innerHTML;
+  target.title=parsed.title||base.hostname;
+  const baseTag=target.createElement('base');
+  baseTag.href=base.href;
+  target.head.insertBefore(baseTag,target.head.firstChild);
+  target.documentElement.style.cssText='min-height:100%;';
+  target.body.style.minHeight='100vh';
+  const inertScripts=[...target.querySelectorAll('script')];
+  for(const inert of inertScripts){
+   if(!inert.isConnected)continue;
+   const live=target.createElement('script');
+   for(const attr of [...inert.attributes])live.setAttribute(attr.name,attr.value);
+   if(!inert.hasAttribute('async'))live.async=false;
+   live.textContent=inert.textContent;
+   const waitForLoad=live.src&&!live.async?new Promise(resolve=>{
+    live.addEventListener('load',resolve,{once:true});
+    live.addEventListener('error',resolve,{once:true});
+   }):null;
+   inert.replaceWith(live);
+   if(waitForLoad)await Promise.race([waitForLoad,new Promise(resolve=>setTimeout(resolve,12000))]);
+  }
   tab.focus();
-  status.textContent='Opened in a new about:blank tab. The website runs inside a sandboxed frame.';
- }catch(err){try{tab.close();}catch{}status.textContent='Could not start source: '+err.message;}
+  status.textContent='Running the HTML directly in the new about:blank tab (no iframe). External scripts and assets load from the original website when the server allows them.';
+ }catch(err){status.textContent='Could not start source: '+(err.message||String(err));}
 }
 $('runCode').addEventListener('click',runLoadedSource);
 $('exitSchool').addEventListener('click',()=>$('schoolOverlay').classList.remove('open'));
