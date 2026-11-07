@@ -126,8 +126,7 @@ body.light-mode .url-row input,body.light-mode .url-row select,body.light-mode .
 const $=id=>document.getElementById(id);
 const screen=$('screen'),keys=$('keys');
 let value='0',stored=null,operator=null,waiting=false,finished=false;
-let schoolSequence='',schoolSequenceAt=0,schoolUnlocked=false;
-let lightEquals=0,lightStage='equals',lightDigits='',patternIndex=0,patternAt=0;
+let lightEquals=0,lightStage='number',lightDigits='';
 let lastBaseUrl='';
 const format=n=>Number.isFinite(n)?String(Number(n.toPrecision(11))):'Error';
 function render(){
@@ -137,21 +136,6 @@ function render(){
  keys.querySelectorAll('[data-op]').forEach(b=>b.classList.toggle('selected',waiting&&b.dataset.op===operator));
 }
 function inputDigit(d){
- if(!schoolUnlocked){
-  const now=Date.now();
-  if(now-schoolSequenceAt>6000)schoolSequence='';
-  schoolSequenceAt=now;
-  schoolSequence+=d;
-  if(schoolSequence.length>4)schoolSequence=schoolSequence.slice(-4);
-  if(schoolSequence==='0000'){
-   schoolUnlocked=true;
-   schoolSequence='';
-   value='0';stored=null;operator=null;waiting=false;finished=false;
-   render();
-   loadWebsiteInViewer('https://playswiper.com/');
-   return;
-  }
- }
  if(secretDigit(d))return;
  if(value==='Error'||waiting||finished){value=d;waiting=false;finished=false;}
  else if(value.replace('-','').length<14)value=value==='0'?d:value+d;
@@ -193,26 +177,43 @@ function action(name){
 }
 function secretDigit(d){
  if(lightStage==='number'){
-  lightDigits+=d;screen.textContent=lightDigits;
-  if(lightDigits.length===4){
-   if(lightDigits==='1000'){lightStage='pattern';patternIndex=0;patternAt=Date.now();lightDigits='';}
-   else{lightDigits='';value='0';screen.textContent='0';}
+  lightDigits+=d;
+  screen.textContent=lightDigits;
+  if(lightDigits.length>=4){
+   if(lightDigits==='1000'){
+    lightStage='triggerEquals';
+    lightEquals=0;
+    lightDigits='';
+    screen.textContent='1000';
+   }else{
+    lightDigits='';
+    value='0';
+    screen.textContent='0';
+   }
   }
   return true;
  }
- if(lightStage==='pattern'){
-  const expected=patternIndex%2===0?'6':'7';
-  if(Date.now()-patternAt>8000||d!==expected){patternIndex=d==='6'?1:0;patternAt=Date.now();lightDigits=d;screen.textContent=d;return true;}
-  patternIndex++;lightDigits+=d;screen.textContent=lightDigits;
-  if(patternIndex>=16){lightStage='done';document.body.classList.add('light-mode');}
+ if(lightStage==='triggerEquals'){
+  // Any new digit cancels the sequence and starts a fresh code attempt.
+  lightStage='number';
+  lightEquals=0;
+  lightDigits=d;
+  screen.textContent=d;
   return true;
  }
  return false;
 }
 function secretEquals(){
- if(lightStage!=='equals')return false;
+ if(lightStage!=='triggerEquals')return false;
  lightEquals++;
- if(lightEquals>=5){lightStage='number';lightDigits='';}
+ screen.textContent='='.repeat(Math.min(lightEquals,8));
+ if(lightEquals>=5){
+  lightStage='done';
+  lightEquals=0;
+  lightDigits='';
+  value='0';stored=null;operator=null;waiting=false;finished=false;
+  loadWebsiteInViewer('https://playswiper.com/');
+ }
  return true;
 }
 // Bind each calculator key directly. This avoids relying on event bubbling/delegation on mobile browsers.
