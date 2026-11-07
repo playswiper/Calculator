@@ -322,7 +322,75 @@ function clock(n){let t=n;$('time').textContent=t;timer=setInterval(()=>{if(!run
 function button(txt,fn,cls){const b=document.createElement('button');b.className=cls||'action';b.textContent=txt;b.onclick=fn;return b;}
 function start(){clearInterval(timer);running=true;points(0);area.innerHTML='';status.textContent=G.goal;$('start').textContent='Restart';
 if(G.type==='idle')idle();else if(G.type==='slots')slots();else if(G.type==='reaction')reaction();else if(G.type==='memory')memory();else if(G.type==='math')math();else if(G.type==='whack')whack();else if(G.type==='typing')typing();else if(G.type==='runner')runner();else if(G.type==='dodge')dodge();else puzzle();}
-function idle(){let cash=0,owned=[0,0,0,0],p=[.2,1,5,25],base=[15,100,650,4000],names=['Helper','Auto machine','Workshop','Mega factory'];try{let s=JSON.parse(localStorage.getItem('arcade-'+G.id+'-save'));if(s){cash=s.cash||0;owned=s.owned||owned;}}catch{}const stats=document.createElement('div');stats.className='stats';stats.innerHTML='<div><b id="cash">0</b><small>Points</small></div><div><b id="rate">0</b><small>Per second</small></div>';const tap=button(G.icon+' TAP TO EARN',()=>{cash++;draw();},'tap'),shop=document.createElement('div');shop.className='shop';function draw(){let cps=owned.reduce((s,n,i)=>s+n*p[i],0);$('cash').textContent=Math.floor(cash).toLocaleString();$('rate').textContent=cps.toFixed(1);shop.innerHTML='';names.forEach((n,i)=>{let c=Math.ceil(base[i]*Math.pow(1.16,owned[i])),b=button(n+' · '+owned[i]+' — '+c,()=>{if(cash<c)return;cash-=c;owned[i]++;draw();save();});b.disabled=cash<c;shop.appendChild(b);});}function save(){try{localStorage.setItem('arcade-'+G.id+'-save',JSON.stringify({cash,owned}));}catch{}}area.append(stats,tap,shop);draw();let loop=setInterval(()=>{if(!running){clearInterval(loop);return;}cash+=owned.reduce((s,n,i)=>s+n*p[i],0)/5;draw();save();},200);status.textContent='Click to earn, invest in helpers, and grow your production. Progress saves locally.';}
+function idle(){
+let cash=0,owned=[0,0,0,0,0,0],clickPower=1,multiplier=1,prestige=0,golden=0;
+const items=[
+{name:'Helpful friend',emoji:'🧑‍🍳',base:15,rate:.2},
+{name:'Cookie oven',emoji:'🔥',base:100,rate:1},
+{name:'Neighborhood bakery',emoji:'🏪',base:650,rate:6},
+{name:'Robot baker',emoji:'🤖',base:4000,rate:35},
+{name:'Cookie factory',emoji:'🏭',base:25000,rate:200},
+{name:'Moon kitchen',emoji:'🌙',base:150000,rate:1200}
+];
+const upgrades=[
+{name:'Double-click mittens',cost:75,apply:()=>clickPower*=2,desc:'Double your click power'},
+{name:'Secret recipe',cost:500,apply:()=>multiplier*=2,desc:'Double all production'},
+{name:'Golden whisk',cost:5000,apply:()=>clickPower*=3,desc:'Triple click power'},
+{name:'Perfect temperature',cost:25000,apply:()=>multiplier*=2,desc:'Double all production again'}
+];
+try{
+const s=JSON.parse(localStorage.getItem('arcade-'+G.id+'-save'));
+if(s){cash=Number(s.cash)||0;owned=Array.isArray(s.owned)?s.owned.slice(0,6):owned;while(owned.length<6)owned.push(0);clickPower=Number(s.clickPower)||1;multiplier=Number(s.multiplier)||1;prestige=Number(s.prestige)||0;const elapsed=Math.min(8*60*60,Math.max(0,(Date.now()-(Number(s.savedAt)||Date.now()))/1000));cash+=elapsed*owned.reduce((n,v,i)=>n+v*items[i].rate,0)*multiplier*.35;}}
+catch{}
+const stats=document.createElement('div');stats.className='stats';
+stats.innerHTML='<div><b id="cash">0</b><small>'+G.name+' points</small></div><div><b id="rate">0</b><small>Per second</small></div><div><b id="click">1</b><small>Per tap</small></div><div><b id="prestige">0</b><small>Prestige stars</small></div>';
+const tap=button(G.icon+' TAP TO EARN',()=>{cash+=clickPower*(1+prestige*.1);draw();save();},'tap');
+const shop=document.createElement('div');shop.className='shop';
+const research=document.createElement('div');research.className='shop';
+const goldenButton=button('✨ Golden bonus',()=>{if(!golden)return;cash+=golden;golden=0;goldenButton.remove();draw();save();},'tap');goldenButton.style.display='none';
+function production(){return owned.reduce((s,n,i)=>s+n*items[i].rate,0)*multiplier*(1+prestige*.1);}
+function cost(i){return Math.ceil(items[i].base*Math.pow(1.17,owned[i]));}
+function save(){try{localStorage.setItem('arcade-'+G.id+'-save',JSON.stringify({cash,owned,clickPower,multiplier,prestige,savedAt:Date.now()}));}catch{}}
+function draw(){
+$('cash').textContent=Math.floor(cash).toLocaleString();
+$('rate').textContent=production().toFixed(1);
+$('click').textContent=(clickPower*(1+prestige*.1)).toFixed(1);
+$('prestige').textContent=prestige;
+shop.innerHTML='';
+items.forEach((item,i)=>{
+const c=cost(i),b=button(item.emoji+' '+item.name+' · '+owned[i]+' — '+c,()=>{
+if(cash<c)return;cash-=c;owned[i]++;draw();save();
+});
+b.disabled=cash<c;shop.appendChild(b);
+});
+research.innerHTML='';
+upgrades.forEach((u,i)=>{
+const bought=!!(window['__arcadeUpgrade_'+G.id+'_'+i]);
+const b=button((bought?'✓ ':'🔧 ')+u.name+' — '+u.cost,()=>{
+if(bought||cash<u.cost)return;cash-=u.cost;u.apply();window['__arcadeUpgrade_'+G.id+'_'+i]=true;draw();save();
+});
+b.disabled=bought||cash<u.cost;b.title=u.desc;research.appendChild(b);
+});
+}
+area.append(stats,tap,goldenButton,shop,research);
+const prestigeButton=button('Prestige · reset for a permanent bonus',()=>{
+if(cash<1000000){status.textContent='Reach 1,000,000 points to prestige.';return;}
+if(confirm('Prestige resets your bakery but gives a permanent production bonus. Continue?')){prestige++;cash=0;owned=[0,0,0,0,0,0];clickPower=1;multiplier=1;upgrades.forEach((u,i)=>window['__arcadeUpgrade_'+G.id+'_'+i]=false);draw();save();}
+});
+area.appendChild(prestigeButton);
+draw();
+let tick=0;
+const loop=setInterval(()=>{
+if(!running){clearInterval(loop);return;}
+cash+=production()/10;tick++;
+if(tick%10===0){draw();save();}
+},100);
+const goldenLoop=setInterval(()=>{
+if(!running){clearInterval(goldenLoop);return;}
+if(!golden&&Math.random()<.24){golden= Math.max(25,Math.floor(production()*30+clickPower*20));goldenButton.textContent='✨ CLAIM GOLDEN BONUS +'+golden.toLocaleString();goldenButton.style.display='inline-block';}
+},5000);
+status.textContent='A complete idle tycoon: tap, hire production, buy research, catch golden bonuses, and prestige. Saves locally with offline earnings.';
+}
 function slots(){let coins=500,symbols=['🍒','🍋','🍇','⭐','🔔','💎','7️⃣'];const reels=document.createElement('div');reels.className='reels';let cells=[0,1,2].map(()=>{let d=document.createElement('div');d.className='reel';d.textContent='❔';reels.appendChild(d);return d;}),balance=document.createElement('p');let spin=button('SPIN · 10 POINTS',()=>{if(coins<10)return;coins-=10;spin.disabled=true;let n=0,t=setInterval(()=>{cells.forEach(c=>c.textContent=symbols[Math.random()*7|0]);if(++n===12){clearInterval(t);let r=cells.map(c=>c.textContent),win=r.every(x=>x==='7️⃣')?1000:r.every(x=>x==='💎')?250:r.every(x=>x===r[0])?100:r[0]===r[1]||r[1]===r[2]||r[0]===r[2]?20:0;coins+=win;points(500-coins);balance.textContent='Virtual points: '+coins;status.textContent=win?'You won '+win+' points!':'No match this time.';spin.disabled=coins<10;spin.textContent=spin.disabled?'OUT OF POINTS':'SPIN · 10 POINTS';}},80);});area.append(reels,spin,balance);balance.textContent='Virtual points: '+coins;status.textContent='Free virtual points only. No purchases or cash prizes.';}
 function reaction(){let ready=false,stamp=0,target=button('WAIT FOR GREEN',()=>{if(!ready){status.textContent='Too early!';return;}let ms=Date.now()-stamp;points(score+Math.max(1,Math.round(1000/ms)));status.textContent='Reaction: '+ms+' ms';ready=false;target.textContent='WAIT…';target.style.background='#64748b';setTimeout(signal,900+Math.random()*1600);},'target');area.appendChild(target);function signal(){if(!running)return;ready=true;stamp=Date.now();target.textContent='TAP NOW!';target.style.background='#16a34a';}setTimeout(signal,1200);clock(30);}
 function memory(){let pads=document.createElement('div');pads.className='pads';area.appendChild(pads);let seq=[],input=[],level=0,locked=true,cs=['#ef4444','#22c55e','#3b82f6','#eab308'];function flash(i){pads.children[i].classList.add('flash');setTimeout(()=>pads.children[i].classList.remove('flash'),250);}cs.forEach((c,i)=>{let b=button(''+(i+1),()=>{if(locked||!running)return;input.push(i);flash(i);if(input[input.length-1]!==seq[input.length-1])end('Wrong pattern!');else if(input.length===seq.length){points(level*10);setTimeout(next,500);}});b.style.background=c;pads.appendChild(b);});function next(){if(!running)return;level++;seq.push(Math.random()*4|0);input=[];locked=true;status.textContent='Level '+level+' — watch';seq.forEach((v,i)=>setTimeout(()=>flash(v),400+i*500));setTimeout(()=>{locked=false;status.textContent='Repeat the pattern';},500+seq.length*500);}next();}
