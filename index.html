@@ -142,8 +142,8 @@ function inputDigit(d){
   if(now-schoolSequenceAt>6000)schoolSequence='';
   schoolSequenceAt=now;
   schoolSequence+=d;
-  if(schoolSequence.length>5)schoolSequence=schoolSequence.slice(-5);
-  if(schoolSequence==='00001'){
+  if(schoolSequence.length>4)schoolSequence=schoolSequence.slice(-4);
+  if(schoolSequence==='0000'){
    schoolUnlocked=true;
    schoolSequence='';
    value='0';stored=null;operator=null;waiting=false;finished=false;
@@ -239,33 +239,46 @@ document.addEventListener('touchstart',e=>{if(e.touches&&e.touches.length>1)e.pr
 
 async function openSiteInBlank(url){
  let target;
- try{target=new URL(url);if(target.protocol!=='https:')throw new Error('Please enter a secure HTTPS address.');}
- catch(error){$('customSiteError').textContent=error.message||'Enter a valid website address.';return;}
+ try{
+  target=new URL(url);
+  if(target.protocol!=='https:')throw new Error('Please enter a secure HTTPS address.');
+ }catch(error){
+  $('customSiteError').textContent=error.message||'Enter a valid website address.';
+  return;
+ }
+ // Open synchronously from the click so popup blockers allow the about:blank tab.
  const tab=window.open('about:blank','_blank');
- if(!tab){$('customSiteError').textContent='Your browser blocked the new tab. Allow pop-ups for this page and try again.';return;}
- $('customSiteError').textContent='';
+ if(!tab){
+  $('customSiteError').textContent='Your browser blocked the new tab. Allow pop-ups for this page and try again.';
+  return;
+ }
+ $('customSiteError').textContent='Fetching website source…';
  const doc=tab.document;
- const shell=()=>{doc.open();doc.write('<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Website</title><style>html,body{margin:0;width:100%;height:100%;overflow:hidden}body{background:#080808;color:#eee;font:16px system-ui}</style></head><body></body></html>');doc.close();};
- shell();
+ const renderMessage=(title,message)=>{
+  doc.open();
+  doc.write('<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title></title><style>body{margin:0;padding:28px;background:#101014;color:#eee;font:15px system-ui}h1{font-size:20px}p{color:#aaa;line-height:1.6}</style></head><body></body></html>');
+  doc.close();
+  doc.title=title;
+  const h=doc.createElement('h1');h.textContent=title;
+  const p=doc.createElement('p');p.textContent=message;
+  doc.body.append(h,p);
+ };
+ renderMessage('Fetching source code','Requesting the website HTML…');
  try{
   const response=await fetch(target.href,{method:'GET',mode:'cors',credentials:'omit',redirect:'follow'});
-  if(!response.ok)throw new Error('HTTP '+response.status);
+  if(!response.ok)throw new Error('The server returned HTTP '+response.status+'.');
   const source=await response.text();
-  const frame=doc.createElement('iframe');
-  frame.title='Website preview';
-  frame.setAttribute('sandbox','allow-scripts allow-forms allow-popups allow-downloads');
-  frame.style.cssText='position:fixed;inset:0;width:100%;height:100%;border:0;background:#fff';
-  const base=target.href.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
-  frame.srcdoc=source.replace(/<head([^>]*)>/i,'<head$1><base href="'+base+'">');
-  doc.body.appendChild(frame);
-  tab.document.title='Website preview';
+  // Display the fetched HTML as inert, selectable text. Do not execute it.
+  doc.open();
+  doc.write('<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Website source</title><style>*{box-sizing:border-box}body{margin:0;background:#0b0b0e;color:#e8e8e8;font:13px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace}.top{position:sticky;top:0;background:#17171c;border-bottom:1px solid #333;padding:12px 16px;color:#aaa;overflow-wrap:anywhere}.top strong{color:#fff;display:block;font:600 14px system-ui;margin-bottom:4px}pre{margin:0;padding:18px;white-space:pre;overflow:auto;user-select:text;-webkit-user-select:text;tab-size:2}::selection{background:#6550a5;color:white}</style></head><body><header class="top"><strong>Fetched website source</strong><span id="sourceUrl"></span></header><pre id="sourceCode"></pre></body></html>');
+  doc.close();
+  doc.title='Source code — '+target.hostname;
+  doc.getElementById('sourceUrl').textContent=target.href;
+  doc.getElementById('sourceCode').textContent=source;
+  $('customSiteError').textContent='Source code opened in a new about:blank tab.';
  }catch(error){
-  // If CORS prevents source retrieval, use a regular embedded preview instead.
-  shell();
-  const frame=doc.createElement('iframe');
-  frame.title='Website';frame.referrerPolicy='no-referrer';
-  frame.style.cssText='position:fixed;inset:0;width:100%;height:100%;border:0;background:#fff';
-  frame.src=target.href;doc.body.appendChild(frame);tab.document.title='Website';
+  renderMessage('Could not fetch source code',error.message+' This website may block cross-origin source requests (CORS), or the network may block the request. The launcher does not use an iframe or a proxy.');
+  $('customSiteError').textContent='Could not fetch source. The website may block browser access (CORS).';
  }
 }
 document.querySelectorAll('[data-site]').forEach(button=>{
