@@ -235,47 +235,24 @@ document.addEventListener('touchstart',e=>{if(e.touches&&e.touches.length>1)e.pr
 
 
 function openSiteInBlank(url){
+ // Keep the top-level tab on about:blank; the selected site is loaded inside it.
  const tab=window.open('about:blank','_blank');
  if(!tab)return;
- const attempts=[
-  url,
-  'https://proxy.cors.dev/'+url,
-  'https://api.allorigins.win/raw?url='+encodeURIComponent(url),
-  'https://thingproxy.freeboard.io/fetch/'+url
- ];
- (async()=>{
-  let source='',lastError='';
-  for(const endpoint of attempts){
-   try{
-    const response=await fetch(endpoint,{mode:'cors',credentials:'omit',redirect:'follow',cache:'no-store'});
-    if(!response.ok)throw new Error('HTTP '+response.status);
-    source=await response.text();
-    if(!source.trim())throw new Error('Empty response');
-    break;
-   }catch(error){lastError=error.message||String(error);}
-  }
-  if(!source){
-   tab.document.open();
-   tab.document.write('<!doctype html><title>Unable to load</title><body style="margin:0;background:#080808;color:white;font:16px sans-serif;display:grid;place-items:center;min-height:100vh;text-align:center;padding:24px">This website could not be loaded in the blank tab. '+String(lastError).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))+'</body>');
-   tab.document.close();
-   return;
-  }
-  try{
-   const parsed=new DOMParser().parseFromString(source,'text/html');
-   const base=new URL(url);
-   let baseTag=parsed.querySelector('base');
-   if(!baseTag){baseTag=parsed.createElement('base');parsed.head.prepend(baseTag);}
-   baseTag.href=base.href;
-   tab.document.open();
-   tab.document.write('<!doctype html>'+parsed.documentElement.outerHTML);
-   tab.document.close();
-   tab.focus();
-  }catch(error){
-   tab.document.open();
-   tab.document.write('<!doctype html><title>Unable to display</title><body style="background:#080808;color:white;font:16px sans-serif;padding:24px">Could not display this page in the blank tab.</body>');
-   tab.document.close();
-  }
- })();
+ try{
+  const safeUrl=new URL(url);
+  if(!['https:'].includes(safeUrl.protocol))throw new Error('Only secure HTTPS sites are allowed.');
+  const doc=tab.document;
+  doc.open();
+  doc.write(`<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title></title>
+<style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000}iframe{display:block;width:100%;height:100%;border:0}</style>
+</head><body><iframe title="Website" src="${safeUrl.href}" referrerpolicy="no-referrer"></iframe></body></html>`);
+  doc.close();
+  tab.focus();
+ }catch(error){
+  tab.document.body.textContent='Unable to open this website.';
+ }
 }
 document.querySelectorAll('[data-site]').forEach(button=>{
  button.addEventListener('click',()=>{
