@@ -4,38 +4,293 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta name="theme-color" content="#000000">
-<title>Calculator</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+<title>Calculator</title>
 <style>
-:root{color-scheme:dark;--orange:#ff9f0a}
-*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;min-height:100%;background:#000}
-body{min-height:100dvh;display:grid;place-items:center;padding:24px;font-family:Fredoka,sans-serif}
-main{width:min(100%,390px);display:grid;grid-template-columns:1fr;gap:16px}
-button{appearance:none;border:0;min-height:112px;border-radius:999px;background:#292929;color:#fff;font:600 clamp(25px,7vw,34px) Fredoka,sans-serif;letter-spacing:.2px;cursor:pointer;touch-action:manipulation;transition:transform .12s,filter .12s;box-shadow:0 5px 0 #171717}
-button:active{transform:scale(.975);filter:brightness(1.2)}
-button:first-child{background:var(--orange);color:#fff;box-shadow:0 5px 0 #a95e00}
-@media(min-width:560px){main{grid-template-columns:1fr 1fr;gap:14px}button{min-height:150px}}
+:root{color-scheme:dark;--orange:#ff9f0a;--panel:#171717;--muted:#a5a5a5}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent; -webkit-touch-callout:none; user-select:none; -webkit-user-select:none; touch-action:manipulation}
+html,body{margin:0;min-height:100%;background:#000;color:#fff;font-family:"Fredoka",sans-serif}
+body{min-height:100dvh;display:grid;place-items:center;padding:16px}
+button,input{font:inherit}
+button{cursor:pointer;touch-action:manipulation}
+.calculator{width:min(100%,390px);display:flex;flex-direction:column;justify-content:flex-end;gap:clamp(9px,2vh,16px)}
+.display{height:clamp(120px,27vh,220px);display:flex;align-items:flex-end;justify-content:flex-end;padding:0 8px 12px;overflow:hidden}
+#screen{width:100%;text-align:right;white-space:nowrap;overflow:hidden;font-size:clamp(48px,14vw,76px);font-weight:300;letter-spacing:-3px;line-height:1.1}
+.keys{display:grid;grid-template-columns:repeat(4,1fr);gap:clamp(8px,2.3vw,13px)}
+.key{appearance:none;border:0;border-radius:50%;aspect-ratio:1;background:#292929;color:#fff;font-size:clamp(22px,6vw,30px);font-weight:400;display:grid;place-items:center;min-width:0;transition:filter .12s,transform .08s;-webkit-tap-highlight-color:transparent}
+.key:active{filter:brightness(1.25)}
+.utility{background:#a5a5a5;color:#000}
+.operator{background:var(--orange);color:#fff;font-size:clamp(27px,7vw,36px)}
+.operator.selected{background:#fff;color:var(--orange)}
+.zero{grid-column:span 2;aspect-ratio:auto;border-radius:999px;justify-content:start;padding-left:calc(25% - 8px)}
+.overlay{position:fixed;inset:0;z-index:5;background:#000e;display:none;place-items:center;padding:18px}
+.overlay.open{display:grid}
+.dialog{width:min(100%,520px);max-height:min(88dvh,850px);overflow:auto;background:#111;border:1px solid #303030;border-radius:22px;padding:22px;box-shadow:0 24px 80px #000}
+.dialog h1{font-size:21px;margin:0 0 8px}
+.dialog p{color:#aaa;font-size:14px;line-height:1.5;margin:0 0 16px}
+.code-display{height:54px;border-radius:12px;background:#050505;border:1px solid #333;display:grid;place-items:center;font-size:25px;letter-spacing:9px;margin:14px 0}
+.code-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+.code-grid button,.secondary{border:1px solid #333;background:#222;color:#fff;border-radius:12px;padding:14px;font-size:18px}
+.code-grid button:active,.secondary:active{background:#444}
+.dialog-actions{display:flex;gap:10px;margin-top:14px}
+.dialog-actions button{flex:1}
+.secondary{font-size:14px;padding:12px}
+.error{color:#ff7777!important;min-height:18px}#loadProgress{font-size:12px;color:#aaa;min-height:18px;margin-top:6px}#loadProgressTrack{height:4px;background:#292929;border-radius:99px;overflow:hidden;margin-top:7px;display:none}#loadProgressBar{height:100%;width:0;background:var(--orange);transition:width .15s linear}
+.school{width:min(100%,900px)}
+.school.fullscreen{position:fixed;inset:0;width:100%;height:100dvh;max-height:none;border-radius:0;display:flex;flex-direction:column}
+.school.fullscreen .source{max-height:24dvh}
+.url-row{display:flex;gap:8px}
+.url-row input,.url-row select{min-width:0;background:#050505;color:white;border:1px solid #393939;border-radius:11px;padding:12px;font-family:"Fredoka",sans-serif}.url-row input{flex:1}.preset-row{display:flex;gap:8px;margin-top:10px}.preset-row select{flex:1;min-width:0;background:#050505;color:#fff;border:1px solid #393939;border-radius:11px;padding:12px;font-family:"Fredoka",sans-serif}.preset-row button{white-space:nowrap}.school.fullscreen .preset-row{flex-shrink:0}
+.primary{background:var(--orange);color:#111;border:0;border-radius:11px;padding:12px 16px;font-weight:700}
+.source{white-space:pre;overflow:auto;user-select:text;-webkit-user-select:text;max-height:48dvh;background:#050505;border:1px solid #333;border-radius:12px;padding:14px;font:12px/1.5 "Fredoka",sans-serif;color:#ddd;margin-top:14px;tab-size:2}
+#acCounter{position:absolute;top:10px;left:12px;color:#ff9f0a;font-size:12px;letter-spacing:.5px;display:none}
+body.light-mode,body.light-mode .overlay{background:#f4f4f4;color:#111}
+body.light-mode .key{background:#dedede;color:#111}
+body.light-mode .utility{background:#bcbcbc;color:#111}
+body.light-mode .operator{background:#ff9f0a;color:#fff}
+body.light-mode .dialog{background:#fff;color:#111;border-color:#ccc}
+body.light-mode .dialog p{color:#555}
+body.light-mode .source{background:#f4f4f4;color:#222;border-color:#ccc}
+body.light-mode .url-row input,body.light-mode .url-row select,body.light-mode .preset-row select{background:#fff;color:#111;border-color:#ccc}
+@media(min-width:500px){.calculator{width:360px}.keys{gap:12px}.key{font-size:28px}}
+
+.catalog-overlay{z-index:20;padding:12px}.catalog-dialog{width:min(100%,1120px);height:min(94dvh,940px);max-height:94dvh;display:flex;flex-direction:column;gap:14px;padding:clamp(16px,3vw,28px);overflow:hidden}
+.catalog-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}.catalog-kicker{font-size:10px;letter-spacing:2px;color:#ff9f0a;font-weight:700}.catalog-heading h1{font-size:clamp(25px,4vw,34px);margin:4px 0}.catalog-heading p{margin:0!important;max-width:650px}.catalog-close{flex:0 0 auto;width:42px;height:42px;padding:8px}
+.catalog-categories{display:flex;gap:7px;flex-wrap:wrap}.catalog-categories button{border:1px solid #353535;background:#1a1a1a;color:#bbb;padding:8px 13px;border-radius:999px;font-size:13px}.catalog-categories button.active{background:#ff9f0a;color:#111;border-color:#ff9f0a;font-weight:700}
+.catalog-meta{display:flex;justify-content:space-between;gap:10px;color:#999;font-size:12px}.catalog-meta strong{color:#fff}.catalog-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,220px),1fr));gap:10px;overflow:auto;min-height:0;flex:1;padding:2px}
+.catalog-card{background:#171717;border:1px solid #303030;border-radius:15px;padding:13px;display:flex;flex-direction:column;min-height:150px}.catalog-card-top{display:flex;justify-content:space-between;align-items:center}.catalog-tag{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#ffb84d}.catalog-license{font-size:10px;color:#7ad69a;border:1px solid #285b3a;border-radius:99px;padding:3px 7px}.catalog-card h3{font-size:17px;margin:12px 0 4px}.catalog-card p{font-size:11px!important;color:#888!important;margin:0 0 12px!important}.catalog-load{margin-top:auto;background:#262626;border:1px solid #444;border-radius:9px;color:#fff;padding:9px;font-size:12px;font-weight:600}.catalog-load:active{background:#ff9f0a;color:#111}
+.catalog-pagination{display:flex;align-items:center;justify-content:center;gap:16px}.catalog-pagination button{padding:9px 13px}.catalog-pagination button:disabled{opacity:.35;cursor:not-allowed}.catalog-pagination span{font-size:12px;color:#aaa;min-width:90px;text-align:center}.catalog-footnote{font-size:11px!important;color:#777!important;margin:0!important}
+@media(max-width:600px){.catalog-dialog{height:96dvh;max-height:96dvh;padding:14px}.catalog-heading p{font-size:12px}.catalog-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.catalog-card{padding:10px;min-height:140px}.catalog-card h3{font-size:14px}.catalog-card p{font-size:10px!important}.catalog-load{font-size:11px;padding:8px}.catalog-categories{gap:5px}.catalog-categories button{padding:7px 10px;font-size:11px}}
+
+.school-sites{position:relative;width:min(100%,520px);display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:54px 20px 20px;background:#101014}
+.school-site{min-height:150px;border:1px solid #383838;border-radius:20px;background:#222;color:#fff;font:700 clamp(21px,5vw,30px) Fredoka,sans-serif;cursor:pointer;box-shadow:0 5px 0 #080808;transition:transform .12s,filter .12s}
+.school-site:active{transform:scale(.97);filter:brightness(1.2)}
+.swiper-site{background:linear-gradient(145deg,#ffad26,#e87900);color:#15100a;border-color:#ffb443}
+.mystars-site{background:linear-gradient(145deg,#29223f,#15121f);border-color:#67518f}
+.school-exit{position:absolute;right:12px;top:10px;width:34px;height:34px;border:1px solid #444;border-radius:50%;background:#242424;color:#fff;font-size:23px;line-height:1;cursor:pointer}
+@media(max-width:440px){.school-sites{gap:9px;padding:52px 12px 14px}.school-site{min-height:125px;font-size:21px}}
 </style>
 </head>
 <body>
-<main aria-label="Websites">
-<button type="button" data-url="https://playswiper.com/">Swiper</button>
-<button type="button" data-url="https://www.mystarsnight.com/home">Mystarsnight</button>
+<main class="calculator" aria-label="Calculator">
+  <div class="display"><output id="screen" aria-live="polite">0</output></div>
+  <div class="keys" id="keys">
+    <button class="key utility" id="clearKey" data-action="clear">AC</button>
+    <button class="key utility" data-action="sign">+/−</button>
+    <button class="key utility" data-action="percent">%</button>
+    <button class="key operator" data-op="÷">÷</button>
+    <button class="key" data-digit="7">7</button><button class="key" data-digit="8">8</button><button class="key" data-digit="9">9</button><button class="key operator" data-op="×">×</button>
+    <button class="key" data-digit="4">4</button><button class="key" data-digit="5">5</button><button class="key" data-digit="6">6</button><button class="key operator" data-op="−">−</button>
+    <button class="key" data-digit="1">1</button><button class="key" data-digit="2">2</button><button class="key" data-digit="3">3</button><button class="key operator" data-op="+">+</button>
+    <button class="key" data-action="backspace" aria-label="Backspace" title="Backspace">←</button><button class="key zero" data-digit="0">0</button><button class="key" data-action="decimal">.</button><button class="key operator" data-action="equals">=</button>
+  </div>
 </main>
+
+<section class="overlay" id="codeOverlay" role="dialog" aria-modal="true" aria-labelledby="codeTitle">
+ <div class="dialog">
+  <h1 id="codeTitle">Enter access code</h1>
+  <p>Enter the four-digit code to continue.</p>
+  <div class="code-display" id="codeDisplay" aria-live="polite">• • • •</div>
+  <div class="code-grid" id="codeKeys">
+   <button data-code="1">1</button><button data-code="2">2</button><button data-code="3">3</button>
+   <button data-code="4">4</button><button data-code="5">5</button><button data-code="6">6</button>
+   <button data-code="7">7</button><button data-code="8">8</button><button data-code="9">9</button>
+   <button data-code="clear">Clear</button><button data-code="0">0</button><button data-code="back">⌫</button>
+  </div>
+  <p class="error" id="codeError"></p>
+  <div class="dialog-actions"><button class="secondary" id="cancelCode">Cancel</button><button class="primary" id="submitCode">Unlock</button></div>
+ </div>
+</section>
+
+<section class="overlay" id="schoolOverlay" role="dialog" aria-modal="true" aria-label="School mode">
+ <div class="dialog school-sites">
+  <button class="school-site swiper-site" type="button" data-site="https://playswiper.com/">Swiper</button>
+  <button class="school-site mystars-site" type="button" data-site="https://www.mystarsnight.com/home">Mystarsnight</button>
+  <button class="school-exit" id="exitSchool" type="button" aria-label="Close">×</button>
+ </div>
+</section>
+
+
+
+
+
+
 <script>
+(()=>{
 'use strict';
-document.querySelectorAll('button[data-url]').forEach(button=>{
-  button.addEventListener('click',()=>{
-    const destination=button.dataset.url;
-    const tab=window.open('about:blank','_blank');
-    if(!tab)return;
-    try{tab.opener=null;tab.location.replace(destination);tab.focus();}
-    catch(error){tab.location.href=destination;}
-  });
+const $=id=>document.getElementById(id);
+const screen=$('screen'),keys=$('keys');
+let value='0',stored=null,operator=null,waiting=false,finished=false;
+let schoolSequence='',schoolSequenceAt=0,schoolUnlocked=false;
+let lightEquals=0,lightStage='equals',lightDigits='',patternIndex=0,patternAt=0;
+let lastBaseUrl='';
+const format=n=>Number.isFinite(n)?String(Number(n.toPrecision(11))):'Error';
+function render(){
+ let shown=value;
+ if(shown.length>11&&shown!=='Error')shown=Number(shown).toExponential(5);
+ screen.textContent=shown;
+ keys.querySelectorAll('[data-op]').forEach(b=>b.classList.toggle('selected',waiting&&b.dataset.op===operator));
+}
+function inputDigit(d){
+ if(!schoolUnlocked){
+  const now=Date.now();
+  if(now-schoolSequenceAt>6000)schoolSequence='';
+  schoolSequenceAt=now;
+  schoolSequence+=d;
+  if(schoolSequence.length>5)schoolSequence=schoolSequence.slice(-5);
+  if(schoolSequence==='00001'){
+   schoolUnlocked=true;
+   schoolSequence='';
+   value='0';stored=null;operator=null;waiting=false;finished=false;
+   render();
+   $('schoolOverlay').classList.add('open');
+   return;
+  }
+ }
+ if(secretDigit(d))return;
+ if(value==='Error'||waiting||finished){value=d;waiting=false;finished=false;}
+ else if(value.replace('-','').length<14)value=value==='0'?d:value+d;
+ render();
+}
+function inputDecimal(){
+ if(value==='Error'||waiting||finished){value='0.';waiting=false;finished=false;}
+ else if(!value.includes('.'))value+='.';
+ render();
+}
+function calculate(a,b,op){
+ switch(op){case '+':return a+b;case '−':return a-b;case '×':return a*b;case '÷':return b===0?NaN:a/b;default:return b;}
+}
+function chooseOperator(next){
+ const n=Number(value);if(!Number.isFinite(n))return;
+ if(operator&&!waiting){stored=calculate(stored,n,operator);value=format(stored);}
+ else stored=n;
+ operator=next;waiting=true;finished=false;render();
+}
+function equals(){
+ if(secretEquals())return;
+ if(!operator||stored===null||waiting)return;
+ value=format(calculate(stored,Number(value),operator));
+ stored=null;operator=null;waiting=true;finished=true;render();
+}
+function clearTap(){
+ value='0';stored=null;operator=null;waiting=false;finished=false;
+ schoolSequence='';
+ render();
+}
+function action(name){
+ if(name==='clear')return clearTap();
+ if(name==='sign'&&value!=='0'&&value!=='Error')value=value.startsWith('-')?value.slice(1):'-'+value;
+ else if(name==='percent'&&value!=='Error')value=format(Number(value)/100);
+ else if(name==='decimal')return inputDecimal();
+ else if(name==='backspace'&&!waiting&&!finished&&value!=='Error')value=value.length<=1||(value.length===2&&value[0]==='-')?'0':value.slice(0,-1);
+ else if(name==='equals')return equals();
+ render();
+}
+function secretDigit(d){
+ if(lightStage==='number'){
+  lightDigits+=d;screen.textContent=lightDigits;
+  if(lightDigits.length===4){
+   if(lightDigits==='1000'){lightStage='pattern';patternIndex=0;patternAt=Date.now();lightDigits='';}
+   else{lightDigits='';value='0';screen.textContent='0';}
+  }
+  return true;
+ }
+ if(lightStage==='pattern'){
+  const expected=patternIndex%2===0?'6':'7';
+  if(Date.now()-patternAt>8000||d!==expected){patternIndex=d==='6'?1:0;patternAt=Date.now();lightDigits=d;screen.textContent=d;return true;}
+  patternIndex++;lightDigits+=d;screen.textContent=lightDigits;
+  if(patternIndex>=16){lightStage='done';document.body.classList.add('light-mode');}
+  return true;
+ }
+ return false;
+}
+function secretEquals(){
+ if(lightStage!=='equals')return false;
+ lightEquals++;
+ if(lightEquals>=5){lightStage='number';lightDigits='';}
+ return true;
+}
+// Bind each calculator key directly. This avoids relying on event bubbling/delegation on mobile browsers.
+keys.querySelectorAll('button').forEach(button=>{
+ button.addEventListener('click',()=>{
+  if(button.dataset.digit!==undefined)inputDigit(button.dataset.digit);
+  else if(button.dataset.op)chooseOperator(button.dataset.op);
+  else if(button.dataset.action)action(button.dataset.action);
+ });
 });
+document.addEventListener('keydown',e=>{
+ if(/^[0-9]$/.test(e.key))inputDigit(e.key);
+ else if(e.key==='.'||e.key===',')inputDecimal();
+ else if(e.key==='Enter'||e.key==='='){e.preventDefault();equals();}
+ else if(e.key==='Escape'||e.key==='Delete')clearTap();
+ else if(e.key==='Backspace')action('backspace');
+ else if(({'+':1,'-':1,'*':1,'/':1})[e.key])chooseOperator(({'+':'+','-':'−','*':'×','/':'÷'})[e.key]);
+ else if(e.key==='%')action('percent');
+});
+['gesturestart','gesturechange','gestureend'].forEach(type=>document.addEventListener(type,e=>e.preventDefault(),{passive:false}));
+document.addEventListener('touchstart',e=>{if(e.touches&&e.touches.length>1)e.preventDefault();},{passive:false});
+
+
+
+function openSiteInBlank(url){
+ const tab=window.open('about:blank','_blank');
+ if(!tab)return;
+ const attempts=[
+  url,
+  'https://proxy.cors.dev/'+url,
+  'https://api.allorigins.win/raw?url='+encodeURIComponent(url),
+  'https://thingproxy.freeboard.io/fetch/'+url
+ ];
+ (async()=>{
+  let source='',lastError='';
+  for(const endpoint of attempts){
+   try{
+    const response=await fetch(endpoint,{mode:'cors',credentials:'omit',redirect:'follow',cache:'no-store'});
+    if(!response.ok)throw new Error('HTTP '+response.status);
+    source=await response.text();
+    if(!source.trim())throw new Error('Empty response');
+    break;
+   }catch(error){lastError=error.message||String(error);}
+  }
+  if(!source){
+   tab.document.open();
+   tab.document.write('<!doctype html><title>Unable to load</title><body style="margin:0;background:#080808;color:white;font:16px sans-serif;display:grid;place-items:center;min-height:100vh;text-align:center;padding:24px">This website could not be loaded in the blank tab. '+String(lastError).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))+'</body>');
+   tab.document.close();
+   return;
+  }
+  try{
+   const parsed=new DOMParser().parseFromString(source,'text/html');
+   const base=new URL(url);
+   let baseTag=parsed.querySelector('base');
+   if(!baseTag){baseTag=parsed.createElement('base');parsed.head.prepend(baseTag);}
+   baseTag.href=base.href;
+   tab.document.open();
+   tab.document.write('<!doctype html>'+parsed.documentElement.outerHTML);
+   tab.document.close();
+   tab.focus();
+  }catch(error){
+   tab.document.open();
+   tab.document.write('<!doctype html><title>Unable to display</title><body style="background:#080808;color:white;font:16px sans-serif;padding:24px">Could not display this page in the blank tab.</body>');
+   tab.document.close();
+  }
+ })();
+}
+document.querySelectorAll('[data-site]').forEach(button=>{
+ button.addEventListener('click',()=>{
+  $('schoolOverlay').classList.remove('open');
+  openSiteInBlank(button.dataset.site);
+ });
+});
+$('exitSchool').addEventListener('click',()=>$('schoolOverlay').classList.remove('open'));
+document.addEventListener('keydown',e=>{
+ if(e.key==='Escape'&&$('schoolOverlay').classList.contains('open'))$('schoolOverlay').classList.remove('open');
+});
+render();
+window.addEventListener('error',e=>{const box=$('sourceError');if(box)box.textContent='App error: '+(e.message||'Unknown JavaScript error');});
+window.addEventListener('unhandledrejection',e=>{const box=$('sourceError');if(box)box.textContent='App error: '+(e.reason?.message||String(e.reason));});
+})();
 </script>
 </body>
 </html>
