@@ -91,10 +91,10 @@ body.light-mode .url-row input,body.light-mode .url-row select,body.light-mode .
 <section class="overlay" id="schoolOverlay" role="dialog" aria-modal="true" aria-labelledby="schoolTitle">
  <div class="dialog school">
 
-  <form class="url-row" id="sourceForm">
+  <div class="url-row" id="sourceForm">
    <input id="siteUrl" type="text" placeholder="https://example.com" autocomplete="url" inputmode="url">
    <button class="primary" type="submit" id="loadSource">Load Source</button>
-  </form>
+  </div>
   <div class="preset-row">
    <select id="gamePreset" aria-label="Choose a game website">
     <option value="">Choose a game website…</option>
@@ -120,7 +120,8 @@ body.light-mode .url-row input,body.light-mode .url-row select,body.light-mode .
    </select>
    <button class="primary" id="loadAndRun" type="button">Load + Run</button>
   </div>
-  <p class="error" id="sourceError" style="margin-top:12px"></p>\n  <div id="loadProgress" aria-live="polite"></div><div id="loadProgressTrack"><div id="loadProgressBar"></div></div>
+  <p class="error" id="sourceError" style="margin-top:12px"></p>
+  <div id="loadProgress" aria-live="polite"></div><div id="loadProgressTrack"><div id="loadProgressBar"></div></div>
   <pre class="source" id="sourceOutput"></pre>
   <div class="dialog-actions">
    <button class="secondary" id="runCode" type="button">Run Code</button>
@@ -242,7 +243,7 @@ document.getElementById('loadAndRun').addEventListener('click',()=>{
   return;
  }
  runAfterLoad=true;
- document.getElementById('sourceForm').requestSubmit();
+ loadSource();
 });
 async function readResponseWithProgress(response,progress,track,bar){
  const total=Number(response.headers.get('content-length'))||0;
@@ -273,8 +274,9 @@ async function readResponseWithProgress(response,progress,track,bar){
  const blob=new Blob(chunks);
  return await blob.text();
 }
-document.getElementById('sourceForm').addEventListener('submit',async e=>{
- e.preventDefault();
+document.getElementById('loadSource').addEventListener('click',loadSource);
+siteUrl.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();loadSource();}});
+async function loadSource(){
  const input=document.getElementById('siteUrl'),error=document.getElementById('sourceError'),output=document.getElementById('sourceOutput'),button=document.getElementById('loadSource');
  const progress=document.getElementById('loadProgress'),track=document.getElementById('loadProgressTrack'),bar=document.getElementById('loadProgressBar');
  let url;
@@ -292,14 +294,21 @@ document.getElementById('sourceForm').addEventListener('submit',async e=>{
  output.textContent='';button.disabled=true;button.textContent='Loading…';
  try{
   let response;
-  try{
-   response=await fetch(url.href,{method:'GET',mode:'cors',credentials:'omit',redirect:'follow'});
-   if(!response.ok)throw new Error('Direct request blocked');
-  }catch(directError){
-   const proxy='https://api.allorigins.win/raw?url='+encodeURIComponent(url.href);
-   response=await fetch(proxy,{method:'GET',mode:'cors',credentials:'omit'});
-   if(!response.ok)throw new Error('Source proxy unavailable');
+  const failures=[];
+  const attempts=[
+   {name:'direct request',url:url.href},
+   {name:'AllOrigins proxy',url:'https://api.allorigins.win/raw?url='+encodeURIComponent(url.href)},
+   {name:'CodeTabs proxy',url:'https://api.codetabs.com/v1/proxy?quest='+encodeURIComponent(url.href)}
+  ];
+  for(const attempt of attempts){
+   try{
+    progress.textContent='Trying '+attempt.name+'…';
+    const candidate=await fetch(attempt.url,{method:'GET',mode:'cors',credentials:'omit',redirect:'follow'});
+    if(!candidate.ok)throw new Error('HTTP '+candidate.status+' '+candidate.statusText);
+    response=candidate;break;
+   }catch(requestError){failures.push(attempt.name+': '+(requestError&&requestError.message?requestError.message:'request failed'));}
   }
+  if(!response)throw new Error(failures.join(' | '));
   progress.textContent='Downloading source… Estimated time remaining: calculating';
   const source=await readResponseWithProgress(response,progress,track,bar);
   if(!source.trim())throw new Error('Empty response');
@@ -311,10 +320,10 @@ document.getElementById('sourceForm').addEventListener('submit',async e=>{
   runAfterLoad=false;
   output.textContent='';
   progress.textContent='';
-  error.textContent='Could not load this website source. The site may block access, require sign-in, or prevent proxy requests.';
+  error.textContent='Load failed: '+(err&&err.message?err.message:'unknown error')+'. Some sites block third-party source requests or require sign-in.';
   if(pendingRunTab){try{pendingRunTab.close()}catch{}pendingRunTab=null;}
  }finally{button.disabled=false;button.textContent='Load Source'}
-});
+}
 function runLoadedSource(){
  const source=document.getElementById('sourceOutput').textContent;
  const status=document.getElementById('sourceError');
