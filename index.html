@@ -136,236 +136,208 @@ body.light-mode .url-row input,body.light-mode .url-row select,body.light-mode .
 
 <script>
 (()=>{
-const screen=document.getElementById('screen'),keys=document.getElementById('keys');
-let value='0',stored=null,op=null,waiting=false,done=false;
-const fmt=n=>Number.isFinite(n)?String(Number(n.toPrecision(11))):'Error';
-function draw(){let s=value;if(s.length>11&&s!=='Error')s=Number(s).toExponential(5);screen.textContent=s;keys.querySelectorAll('[data-op]').forEach(b=>b.classList.toggle('selected',waiting&&b.dataset.op===op))}
-function digit(d){if(secretDigit(d))return;if(value==='Error'||waiting||done){value=d;waiting=false;done=false}else if(value.replace('-','').length<14)value=value==='0'?d:value+d;draw()}
-function decimal(){if(value==='Error'||waiting||done){value='0.';waiting=false;done=false}else if(!value.includes('.'))value+='.';draw()}
-function calc(a,b,o){return o==='+'?a+b:o==='−'?a-b:o==='×'?a*b:o==='÷'?(b===0?NaN:a/b):b}
-function choose(o){let n=Number(value);if(!Number.isFinite(n))return;if(op&&!waiting){stored=calc(stored,n,op);value=fmt(stored)}else stored=n;op=o;waiting=true;done=false;draw()}
-function equal(){if(secretEquals())return;if(!op||stored===null||waiting)return;value=fmt(calc(stored,Number(value),op));stored=null;op=null;waiting=true;done=true;draw()}
-function action(a){if(a==='clear'){value='0';stored=null;op=null;waiting=false;done=false;handleAcTap();if(schoolArmed)value=String(acCount)}
-else if(a==='sign'&&value!=='0'&&value!=='Error')value=value.startsWith('-')?value.slice(1):'-'+value;
-else if(a==='percent'&&value!=='Error')value=fmt(Number(value)/100);
-else if(a==='decimal')return decimal();
-else if(a==='backspace'&&!waiting&&!done&&value!=='Error')value=value.length<=1||(value.length===2&&value[0]==='-')?'0':value.slice(0,-1);
-else if(a==='equals')return equal();draw()}
-keys.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.digit!==undefined)digit(b.dataset.digit);else if(b.dataset.op)choose(b.dataset.op);else if(b.dataset.action)action(b.dataset.action)});
-document.addEventListener('keydown',e=>{if(document.getElementById('codeOverlay').classList.contains('open')){if(/^[0-9]$/.test(e.key))addCode(e.key);else if(e.key==='Backspace')addCode('back');else if(e.key==='Enter')unlock();else if(e.key==='Escape')closeCode();return}if(/^[0-9]$/.test(e.key))digit(e.key);else if(e.key==='.'||e.key===',')decimal();else if(e.key==='Enter'||e.key==='='){e.preventDefault();equal()}else if(e.key==='Escape'||e.key==='Delete')action('clear');else if(e.key==='Backspace')action('backspace');else if(({'+':1,'-':1,'*':1,'/':1})[e.key])choose(({'+':'+','-':'−','*':'×','/':'÷'})[e.key]);else if(e.key==='%')action('percent')});
-draw();
-
-// Prevent iOS Safari gesture zoom while rapidly tapping calculator keys.
-['gesturestart','gesturechange','gestureend'].forEach(type=>{
- document.addEventListener(type,e=>e.preventDefault(),{passive:false});
-});
-document.addEventListener('touchstart',e=>{
- if(e.touches&&e.touches.length>1)e.preventDefault();
-},{passive:false});
-
-// Hidden School Mode unlock: 10 AC taps within 10 seconds, then 100 additional AC taps.
-const clearKey=document.getElementById('clearKey');
-let acWarmup=0,acWarmupStart=0,acCount=0,schoolArmed=false,schoolUnlocked=false;
-function handleAcTap(){
- const now=Date.now();
- if(schoolUnlocked)return;
- if(!schoolArmed){
-  if(!acWarmup||now-acWarmupStart>10000){acWarmup=0;acWarmupStart=now}
-  acWarmup++;
-  if(acWarmup>=10){schoolArmed=true;acCount=0;}
-  return;
- }
- acCount++;
- if(acCount>=100){
-  schoolUnlocked=true;
-  document.getElementById('schoolOverlay').classList.add('open');
- }
+'use strict';
+const $=id=>document.getElementById(id);
+const screen=$('screen'),keys=$('keys');
+let value='0',stored=null,operator=null,waiting=false,finished=false;
+let warmup=0,warmupAt=0,armed=false,acCount=0,schoolUnlocked=false;
+let lightEquals=0,lightStage='equals',lightDigits='',patternIndex=0,patternAt=0;
+let pendingTab=null,runAfterLoad=false,lastBaseUrl='';
+const format=n=>Number.isFinite(n)?String(Number(n.toPrecision(11))):'Error';
+function render(){
+ let shown=value;
+ if(shown.length>11&&shown!=='Error')shown=Number(shown).toExponential(5);
+ screen.textContent=shown;
+ keys.querySelectorAll('[data-op]').forEach(b=>b.classList.toggle('selected',waiting&&b.dataset.op===operator));
 }
-
-// Hidden light-mode sequence. No progress counters or on-screen clues are shown.
-let hintEquals=0,hintStage='equals',hintNumber='',hintPatternIndex=0,hintPatternStarted=0;
+function inputDigit(d){
+ if(secretDigit(d))return;
+ if(value==='Error'||waiting||finished){value=d;waiting=false;finished=false;}
+ else if(value.replace('-','').length<14)value=value==='0'?d:value+d;
+ render();
+}
+function inputDecimal(){
+ if(value==='Error'||waiting||finished){value='0.';waiting=false;finished=false;}
+ else if(!value.includes('.'))value+='.';
+ render();
+}
+function calculate(a,b,op){
+ switch(op){case '+':return a+b;case '−':return a-b;case '×':return a*b;case '÷':return b===0?NaN:a/b;default:return b;}
+}
+function chooseOperator(next){
+ const n=Number(value);if(!Number.isFinite(n))return;
+ if(operator&&!waiting){stored=calculate(stored,n,operator);value=format(stored);}
+ else stored=n;
+ operator=next;waiting=true;finished=false;render();
+}
+function equals(){
+ if(secretEquals())return;
+ if(!operator||stored===null||waiting)return;
+ value=format(calculate(stored,Number(value),operator));
+ stored=null;operator=null;waiting=true;finished=true;render();
+}
+function clearTap(){
+ value='0';stored=null;operator=null;waiting=false;finished=false;
+ if(!schoolUnlocked){
+  const now=Date.now();
+  if(!armed){
+   if(!warmup||now-warmupAt>10000){warmup=0;warmupAt=now;}
+   warmup++;
+   if(warmup>=10){armed=true;acCount=0;}
+  }else{
+   acCount++;
+   if(acCount>=100){schoolUnlocked=true;$('schoolOverlay').classList.add('open');}
+  }
+  if(armed&&!schoolUnlocked)value=String(acCount);
+ }
+ render();
+}
+function action(name){
+ if(name==='clear')return clearTap();
+ if(name==='sign'&&value!=='0'&&value!=='Error')value=value.startsWith('-')?value.slice(1):'-'+value;
+ else if(name==='percent'&&value!=='Error')value=format(Number(value)/100);
+ else if(name==='decimal')return inputDecimal();
+ else if(name==='backspace'&&!waiting&&!finished&&value!=='Error')value=value.length<=1||(value.length===2&&value[0]==='-')?'0':value.slice(0,-1);
+ else if(name==='equals')return equals();
+ render();
+}
 function secretDigit(d){
- if(hintStage==='number'){
-  hintNumber+=d;
-  screen.textContent=hintNumber;
-  if(hintNumber.length>=4){
-   if(hintNumber==='1000'){
-    hintStage='pattern';hintPatternIndex=0;hintPatternStarted=Date.now();
-    hintNumber='';
-   }else{
-    hintNumber='';screen.textContent='0';
-   }
+ if(lightStage==='number'){
+  lightDigits+=d;screen.textContent=lightDigits;
+  if(lightDigits.length===4){
+   if(lightDigits==='1000'){lightStage='pattern';patternIndex=0;patternAt=Date.now();lightDigits='';}
+   else{lightDigits='';value='0';screen.textContent='0';}
   }
   return true;
  }
- if(hintStage==='pattern'){
-  const expected=hintPatternIndex%2===0?'6':'7';
-  if(Date.now()-hintPatternStarted>8000||d!==expected){
-   hintPatternIndex=d==='6'?1:0;
-   hintPatternStarted=Date.now();
-   hintNumber=d;
-   screen.textContent=hintNumber;
-   return true;
-  }
-  hintPatternIndex++;
-  hintNumber+=d;
-  screen.textContent=hintNumber;
-  if(hintPatternIndex>=16){
-   hintStage='done';
-   document.body.classList.add('light-mode');
-  }
+ if(lightStage==='pattern'){
+  const expected=patternIndex%2===0?'6':'7';
+  if(Date.now()-patternAt>8000||d!==expected){patternIndex=d==='6'?1:0;patternAt=Date.now();lightDigits=d;screen.textContent=d;return true;}
+  patternIndex++;lightDigits+=d;screen.textContent=lightDigits;
+  if(patternIndex>=16){lightStage='done';document.body.classList.add('light-mode');}
   return true;
  }
  return false;
 }
 function secretEquals(){
- if(hintStage!=='equals')return false;
- hintEquals++;
- if(hintEquals>=5){
-  hintStage='number';hintNumber='';
- }
+ if(lightStage!=='equals')return false;
+ lightEquals++;
+ if(lightEquals>=5){lightStage='number';lightDigits='';}
  return true;
 }
-
-document.getElementById('codeKeys').addEventListener('click',e=>{const b=e.target.closest('button');if(b)addCode(b.dataset.code)});
-document.getElementById('submitCode').addEventListener('click',unlock);
-document.getElementById('cancelCode').addEventListener('click',closeCode);
-document.getElementById('exitSchool').addEventListener('click',()=>document.getElementById('schoolOverlay').classList.remove('open'));
-const gamePreset=document.getElementById('gamePreset'),siteUrl=document.getElementById('siteUrl');
-gamePreset.addEventListener('change',()=>{if(gamePreset.value)siteUrl.value=gamePreset.value;});
-// Load the selected website's HTML source and execute it in about:blank (no iframe).
-let runAfterLoad=false,pendingRunTab=null,lastLoadedBaseUrl='';
-document.getElementById('loadAndRun').addEventListener('click',()=>{
- // Open the blank tab synchronously inside the tap handler so popup blockers allow it.
- pendingRunTab=window.open('about:blank','_blank');
- if(!pendingRunTab){
-  document.getElementById('sourceError').textContent='Your browser blocked the blank tab. Allow pop-ups for this site, then try again.';
-  return;
- }
- runAfterLoad=true;
- loadSource();
+// Bind each calculator key directly. This avoids relying on event bubbling/delegation on mobile browsers.
+keys.querySelectorAll('button').forEach(button=>{
+ button.addEventListener('click',()=>{
+  if(button.dataset.digit!==undefined)inputDigit(button.dataset.digit);
+  else if(button.dataset.op)chooseOperator(button.dataset.op);
+  else if(button.dataset.action)action(button.dataset.action);
+ });
 });
-async function readResponseWithProgress(response,progress,track,bar){
- const total=Number(response.headers.get('content-length'))||0;
- const started=Date.now();
- if(!response.body||!response.body.getReader){
-  progress.textContent=total?'Downloading… Estimated time remaining: calculating':'Downloading… Estimated time remaining unavailable';
-  return await response.text();
- }
- const reader=response.body.getReader();
- const chunks=[];
- let received=0;
+document.addEventListener('keydown',e=>{
+ if(/^[0-9]$/.test(e.key))inputDigit(e.key);
+ else if(e.key==='.'||e.key===',')inputDecimal();
+ else if(e.key==='Enter'||e.key==='='){e.preventDefault();equals();}
+ else if(e.key==='Escape'||e.key==='Delete')clearTap();
+ else if(e.key==='Backspace')action('backspace');
+ else if(({'+':1,'-':1,'*':1,'/':1})[e.key])chooseOperator(({'+':'+','-':'−','*':'×','/':'÷'})[e.key]);
+ else if(e.key==='%')action('percent');
+});
+['gesturestart','gesturechange','gestureend'].forEach(type=>document.addEventListener(type,e=>e.preventDefault(),{passive:false}));
+document.addEventListener('touchstart',e=>{if(e.touches&&e.touches.length>1)e.preventDefault();},{passive:false});
+
+const preset=$('gamePreset'),siteInput=$('siteUrl');
+preset.addEventListener('change',()=>{if(preset.value)siteInput.value=preset.value;});
+$('loadAndRun').addEventListener('click',()=>{
+ pendingTab=window.open('about:blank','_blank');
+ if(!pendingTab){$('sourceError').textContent='Pop-up blocked. Allow pop-ups and try again.';return;}
+ runAfterLoad=true;loadSource();
+});
+$('loadSource').addEventListener('click',loadSource);
+siteInput.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();loadSource();}});
+async function readWithProgress(response){
+ const progress=$('loadProgress'),track=$('loadProgressTrack'),bar=$('loadProgressBar');
+ const total=Number(response.headers.get('content-length'))||0,start=Date.now();
+ if(!response.body?.getReader){progress.textContent='Downloading… remaining time unavailable';return response.text();}
+ const reader=response.body.getReader(),chunks=[];let received=0;
  while(true){
-  const part=await reader.read();
-  if(part.done)break;
+  const part=await reader.read();if(part.done)break;
   chunks.push(part.value);received+=part.value.length;
-  const elapsed=Math.max((Date.now()-started)/1000,.1);
   if(total>0){
-   const percent=Math.min(100,received/total*100);
-   const rate=received/elapsed;
-   const remaining=rate>0?Math.max(0,(total-received)/rate):0;
-   progress.textContent='Downloading '+Math.round(percent)+'% · Estimated time remaining: '+(remaining<1?'less than 1 second':Math.ceil(remaining)+' seconds');
-   track.style.display='block';bar.style.width=percent+'%';
-  }else{
-   progress.textContent='Downloading… Estimated time remaining unavailable (server does not share file size)';
-   track.style.display='block';bar.style.width='indeterminate';
-  }
+   const elapsed=Math.max((Date.now()-start)/1000,.1),remaining=(total-received)/(received/elapsed);
+   const pct=Math.min(100,received/total*100);
+   progress.textContent='Downloading '+Math.round(pct)+'% · '+(remaining<1?'less than 1 second':Math.ceil(remaining)+' seconds remaining');
+   track.style.display='block';bar.style.width=pct+'%';
+  }else{progress.textContent='Downloading… remaining time unavailable (server hides file size)';track.style.display='block';}
  }
- const blob=new Blob(chunks);
- return await blob.text();
+ return new Blob(chunks).text();
 }
-document.getElementById('loadSource').addEventListener('click',loadSource);
-siteUrl.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();loadSource();}});
 async function loadSource(){
- const input=document.getElementById('siteUrl'),error=document.getElementById('sourceError'),output=document.getElementById('sourceOutput'),button=document.getElementById('loadSource');
- const progress=document.getElementById('loadProgress'),track=document.getElementById('loadProgressTrack'),bar=document.getElementById('loadProgressBar');
+ const error=$('sourceError'),output=$('sourceOutput'),button=$('loadSource'),progress=$('loadProgress'),track=$('loadProgressTrack'),bar=$('loadProgressBar');
  let url;
  try{
-  const raw=input.value.trim();
-  if(!raw)throw new Error();
+  const raw=siteInput.value.trim();if(!raw)throw new Error('Enter a website address first.');
   url=new URL(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(raw)?raw:'https://'+raw);
-  if(!['http:','https:'].includes(url.protocol))throw new Error();
- }catch{
-  error.textContent='Check the web address and try again.';
-  if(pendingRunTab){pendingRunTab.close();pendingRunTab=null;}
-  runAfterLoad=false;return;
- }
- error.textContent='';progress.textContent='Connecting…';track.style.display='none';bar.style.width='0';
- output.textContent='';button.disabled=true;button.textContent='Loading…';
+  if(!['http:','https:'].includes(url.protocol))throw new Error('Only HTTP and HTTPS addresses are supported.');
+ }catch(err){error.textContent=err.message;closePendingTab();runAfterLoad=false;return;}
+ error.textContent='';output.textContent='';progress.textContent='Connecting…';track.style.display='none';bar.style.width='0';
+ button.disabled=true;button.textContent='Loading…';
  try{
-  let response;
-  const failures=[];
+  let response=null;const errors=[];
   const attempts=[
-   {name:'direct request',url:url.href},
-   {name:'AllOrigins proxy',url:'https://api.allorigins.win/raw?url='+encodeURIComponent(url.href)},
-   {name:'CodeTabs proxy',url:'https://api.codetabs.com/v1/proxy?quest='+encodeURIComponent(url.href)}
+   ['Direct',url.href],
+   ['AllOrigins','https://api.allorigins.win/raw?url='+encodeURIComponent(url.href)],
+   ['CodeTabs','https://api.codetabs.com/v1/proxy?quest='+encodeURIComponent(url.href)]
   ];
-  for(const attempt of attempts){
+  for(const [label,endpoint] of attempts){
    try{
-    progress.textContent='Trying '+attempt.name+'…';
-    const candidate=await fetch(attempt.url,{method:'GET',mode:'cors',credentials:'omit',redirect:'follow'});
-    if(!candidate.ok)throw new Error('HTTP '+candidate.status+' '+candidate.statusText);
+    progress.textContent='Trying '+label+'…';
+    const candidate=await fetch(endpoint,{mode:'cors',credentials:'omit',redirect:'follow'});
+    if(!candidate.ok)throw new Error('HTTP '+candidate.status);
     response=candidate;break;
-   }catch(requestError){failures.push(attempt.name+': '+(requestError&&requestError.message?requestError.message:'request failed'));}
+   }catch(err){errors.push(label+': '+(err.message||'request failed'));}
   }
-  if(!response)throw new Error(failures.join(' | '));
-  progress.textContent='Downloading source… Estimated time remaining: calculating';
-  const source=await readResponseWithProgress(response,progress,track,bar);
-  if(!source.trim())throw new Error('Empty response');
+  if(!response)throw new Error(errors.join(' | '));
+  const source=await readWithProgress(response);
+  if(!source.trim())throw new Error('The server returned an empty page.');
   output.textContent=source;
-  lastLoadedBaseUrl=response.url&&response.url.includes('allorigins')?url.href:(response.url||url.href);
-  progress.textContent='Download complete.';
+  lastBaseUrl=response.url.includes('allorigins')||response.url.includes('codetabs')?url.href:(response.url||url.href);
+  progress.textContent='Source loaded successfully.';
   if(runAfterLoad){runAfterLoad=false;runLoadedSource();}
  }catch(err){
-  runAfterLoad=false;
-  output.textContent='';
-  progress.textContent='';
-  error.textContent='Load failed: '+(err&&err.message?err.message:'unknown error')+'. Some sites block third-party source requests or require sign-in.';
-  if(pendingRunTab){try{pendingRunTab.close()}catch{}pendingRunTab=null;}
- }finally{button.disabled=false;button.textContent='Load Source'}
+  error.textContent='Could not load source: '+err.message;
+  progress.textContent='';closePendingTab();runAfterLoad=false;
+ }finally{button.disabled=false;button.textContent='Load Source';}
 }
+function closePendingTab(){if(pendingTab){try{pendingTab.close();}catch{}pendingTab=null;}}
 function runLoadedSource(){
- const source=document.getElementById('sourceOutput').textContent;
- const status=document.getElementById('sourceError');
- if(!source.trim()){status.textContent='Load source code first.';return}
- let tab=pendingRunTab;
- if(!tab||tab.closed)tab=window.open('about:blank','_blank');
- pendingRunTab=null;
- if(!tab){status.textContent='Allow pop-ups to run the source in a new blank tab.';return}
+ const source=$('sourceOutput').textContent,status=$('sourceError');
+ if(!source.trim()){status.textContent='Load source first.';return;}
+ let tab=pendingTab;if(!tab||tab.closed)tab=window.open('about:blank','_blank');
+ pendingTab=null;if(!tab){status.textContent='Pop-up blocked. Allow pop-ups and try again.';return;}
  try{
-  const baseUrl=lastLoadedBaseUrl||siteUrl.value.trim();
-  const target=new URL(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(baseUrl)?baseUrl:'https://'+baseUrl);
-  const baseTag='<base href="'+target.href.replace(/"/g,'%22')+'">';
-  const runnable=/<head[^>]*>/i.test(source)?source.replace(/<head[^>]*>/i,match=>match+baseTag):baseTag+source;
-  tab.document.open();
-  tab.document.write(runnable);
-  tab.document.close();
-  tab.focus();
-  status.textContent='Website opened in a new blank tab. Only run code from websites you trust.';
- }catch(err){
-  try{tab.close()}catch{}
-  status.textContent='The source could not be started in the blank tab.';
- }
+  const base=new URL(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(lastBaseUrl)?lastBaseUrl:'https://'+lastBaseUrl);
+  const baseTag='<base href="'+base.href.replace(/"/g,'%22')+'">';
+  const runnable=/<head[^>]*>/i.test(source)?source.replace(/<head[^>]*>/i,m=>m+baseTag):baseTag+source;
+  tab.document.open();tab.document.write(runnable);tab.document.close();tab.focus();
+  status.textContent='Opened in a new tab. Only run code from sites you trust.';
+ }catch(err){try{tab.close();}catch{}status.textContent='Could not start source: '+err.message;}
 }
-document.getElementById('runCode').addEventListener('click',runLoadedSource);
-
-
-document.getElementById('fullScreen').addEventListener('click',async()=>{
+$('runCode').addEventListener('click',runLoadedSource);
+$('exitSchool').addEventListener('click',()=>$('schoolOverlay').classList.remove('open'));
+$('fullScreen').addEventListener('click',async()=>{
  const panel=document.querySelector('#schoolOverlay .school');
- try{
-  if(document.fullscreenElement){await document.exitFullscreen();panel.classList.remove('fullscreen')}
-  else{await panel.requestFullscreen();panel.classList.add('fullscreen')}
- }catch{panel.classList.toggle('fullscreen')}
+ try{if(document.fullscreenElement){await document.exitFullscreen();panel.classList.remove('fullscreen');}
+ else{await panel.requestFullscreen();panel.classList.add('fullscreen');}}
+ catch(err){$('sourceError').textContent='Full screen unavailable: '+err.message;}
 });
-document.addEventListener('fullscreenchange',()=>{
- if(!document.fullscreenElement)document.querySelector('#schoolOverlay .school').classList.remove('fullscreen');
+document.addEventListener('fullscreenchange',()=>{if(!document.fullscreenElement)document.querySelector('#schoolOverlay .school').classList.remove('fullscreen');});
+$('copySource').addEventListener('click',async()=>{
+ try{await navigator.clipboard.writeText($('sourceOutput').textContent);$('sourceError').textContent='Source copied.';}
+ catch(err){$('sourceError').textContent='Copy unavailable: '+err.message;}
 });
-
-document.getElementById('copySource').addEventListener('click',async()=>{
- const text=document.getElementById('sourceOutput').textContent;
- try{await navigator.clipboard.writeText(text);document.getElementById('sourceError').textContent='Source copied.'}
- catch{document.getElementById('sourceError').textContent='Clipboard access is unavailable in this browser.'}
-});
+render();
+window.addEventListener('error',e=>{const box=$('sourceError');if(box)box.textContent='App error: '+(e.message||'Unknown JavaScript error');});
+window.addEventListener('unhandledrejection',e=>{const box=$('sourceError');if(box)box.textContent='App error: '+(e.reason?.message||String(e.reason));});
 })();
 </script>
 </body>
