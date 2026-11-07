@@ -122,29 +122,16 @@ body.light-mode .url-row input,body.light-mode .url-row select,body.light-mode .
  </div>
 </section>
 
-<section class="overlay" id="schoolOverlay" role="dialog" aria-modal="true" aria-labelledby="schoolTitle">
- <div class="dialog school">
-
-  <input id="siteUrl" type="hidden" value="">
-  <div class="preset-row"><button class="primary" type="button" id="openGameCatalog" style="width:100%">🎮 Browse Games</button></div>
-  <div class="preset-row">
-   <select id="gamePreset" aria-label="Choose a website">
-    <option value="">Choose a website…</option>
-    <option value="https://playswiper.com/">Swiper — playswiper.com</option>
-    <option value="https://www.mystarsnight.com/">Mystarsnight.com</option>
-   </select>
-   <button class="primary" type="button" id="loadSource">Open Website</button>
-  </div>
-  <p class="error" id="sourceError" style="margin-top:12px"></p>
-  <div id="loadProgress" aria-live="polite"></div><div id="loadProgressTrack"><div id="loadProgressBar"></div></div>
-  <pre class="source" id="sourceOutput"></pre>
-  <div class="dialog-actions">
-   <button class="secondary" id="runCode" type="button">Play Game</button>
-   <button class="secondary" id="fullScreen" type="button">Full Screen</button>
-   <button class="secondary" id="copySource" type="button">Copy</button>
-   <button class="secondary" id="exitSchool" type="button">Exit</button>
-  </div>
- </div>
+<section id="schoolOverlay" style="display:none" aria-hidden="true">
+<input id="siteUrl" type="hidden" value="">
+<select id="gamePreset"><option value="https://playswiper.com/">Swiper</option><option value="https://www.mystarsnight.com/">Mystarsnight</option></select>
+<button id="loadSource" type="button">Open</button>
+<button id="runCode" type="button">Play</button>
+<button id="fullScreen" type="button">Full Screen</button>
+<button id="copySource" type="button">Copy</button>
+<button id="exitSchool" type="button">Exit</button>
+<div id="sourceError"></div><div id="loadProgress"></div><div id="loadProgressTrack"><div id="loadProgressBar"></div></div>
+<pre id="sourceOutput"></pre>
 </section>
 
 
@@ -153,8 +140,8 @@ body.light-mode .url-row input,body.light-mode .url-row select,body.light-mode .
 <section class="overlay catalog-overlay" id="catalogOverlay" role="dialog" aria-modal="true" aria-labelledby="catalogTitle">
  <div class="dialog catalog-dialog">
   <div class="catalog-heading"><div><div class="catalog-kicker">THE ARCADE</div><h1 id="catalogTitle">Play Games</h1><p>Pick a game, jump in, and have fun. New favorites are waiting.</p></div><button class="secondary catalog-close" id="catalogClose" type="button" aria-label="Close catalog">✕</button></div>
-  <div class="catalog-categories" id="catalogCategories"><button type="button" data-category="All" class="active">All</button><button type="button" data-category="Arcade" class="">Arcade</button><button type="button" data-category="Action" class="">Action</button><button type="button" data-category="Puzzle" class="">Puzzle</button><button type="button" data-category="Adventure" class="">Adventure</button><button type="button" data-category="Racing" class="">Racing</button><button type="button" data-category="Skill" class="">Skill</button></div>
-  <div class="catalog-meta"><strong id="catalogCount"></strong><span>Pick a game and jump straight in</span></div>
+  <div class="catalog-categories" id="catalogCategories"><button type="button" data-category="All" class="active">All</button><button type="button" data-category="Arcade" class="">Arcade</button><button type="button" data-category="Action" class="">Action</button><button type="button" data-category="Puzzle" class="">Puzzle</button><button type="button" data-category="Adventure" class="">Adventure</button><button type="button" data-category="Racing" class="">Racing</button><button type="button" data-category="Skill" class="">Skill</button><button type="button" data-category="Shooter">Shooter</button><button type="button" data-category="Sports">Sports</button><button type="button" data-category="Platformer">Platformer</button><button type="button" data-category="Casual">Casual</button><button type="button" data-category="Board">Board</button><button type="button" data-category="Word &amp; Quiz">Word &amp; Quiz</button><button type="button" data-category="3D">3D</button></div>
+  <div class="catalog-meta"><strong id="catalogCount"></strong><span>Hundreds of games. Pick one and jump straight in.</span></div>
   <div class="catalog-grid" id="catalogGrid"></div>
   <div class="catalog-pagination"><button class="secondary" id="catalogPrev" type="button">← Previous</button><span id="catalogPageLabel"></span><button class="secondary" id="catalogNext" type="button">Next →</button></div>
   <p class="catalog-footnote">Select a game to launch it in its own full-window tab.</p>
@@ -285,6 +272,31 @@ gameCatalog.push({title:"Pong",category:"Arcade",url:"https://raw.githubusercont
 gameCatalog.push({title:"Snake",category:"Arcade",url:"https://raw.githubusercontent.com/stahllll/simple-games/main/snake.html",source:"Simple Games",author:"stahllll",repo:"simple-games",icon:"🐍"});
 gameCatalog.push({title:"Whack-a-Mole",category:"Arcade",url:"https://raw.githubusercontent.com/stahllll/simple-games/main/whack-a-mole.html",source:"Simple Games",author:"stahllll",repo:"simple-games",icon:"🔨"});
 gameCatalog.push({title:'Cookie Clicker',category:'Arcade',url:'https://raw.githubusercontent.com/OjiTheChamp/cookie-clicker/main/index.html',source:'Cookie Clicker Community Clone',author:'OjiTheChamp',repo:'cookie-clicker'});
+let extraCatalogLoaded=false,extraCatalogLoading=null;
+async function loadExtraCatalog(){
+ if(extraCatalogLoaded||extraCatalogLoading)return extraCatalogLoading;
+ extraCatalogLoading=(async()=>{
+  try{
+   const response=await fetch('https://raw.githubusercontent.com/sausi-7/games/main/games/registry.json',{mode:'cors',credentials:'omit',cache:'no-store'});
+   if(!response.ok)throw new Error('Catalog unavailable');
+   const registry=await response.json();
+   const categoryMap={puzzle:'Puzzle',arcade:'Arcade',shooter:'Shooter',racing:'Racing',sports:'Sports',platformer:'Platformer',casual:'Casual',board:'Board','word-quiz':'Word & Quiz','3d':'3D'};
+   const categoryIcons={puzzle:'🧩',arcade:'🕹️',shooter:'🎯',racing:'🏎️',sports:'⚽',platformer:'🏃',casual:'🎈',board:'♟️','word-quiz':'📝','3d':'🌐'};
+   const known=new Set(gameCatalog.map(g=>g.title.toLowerCase()));
+   for(const game of (registry.games||[])){
+    if(!game.name||!game.path||known.has(game.name.toLowerCase()))continue;
+    const category=categoryMap[game.category]||'Arcade';
+    gameCatalog.push({title:game.name,category,url:'https://sausi-7.github.io/games/'+game.path,source:'Arcade Collection',author:'sausi-7',repo:'games',icon:categoryIcons[game.category]||'🎮',description:game.description||'Jump in and play.'});
+    known.add(game.name.toLowerCase());
+   }
+   extraCatalogLoaded=true;
+   $('catalogMetaHint').textContent='More games added · '+gameCatalog.length+' to explore';
+  }catch(error){
+   $('catalogMetaHint').textContent='Browse the games below';
+  }finally{extraCatalogLoading=null;renderCatalog();}
+ })();
+ return extraCatalogLoading;
+}
 const catalogOverlay=$('catalogOverlay');
 let catalogCategory='All',catalogPage=0;
 const catalogPageSize=24;
@@ -301,7 +313,7 @@ function renderCatalog(){
  $('catalogCategories').querySelectorAll('[data-category]').forEach(b=>b.classList.toggle('active',b.dataset.category===catalogCategory));
  $('catalogGrid').querySelectorAll('[data-index]').forEach(btn=>btn.addEventListener('click',()=>loadCatalogGame(items[Number(btn.dataset.index)])));
 }
-function openCatalog(){catalogPage=0;renderCatalog();catalogOverlay.classList.add('open');}
+function openCatalog(){catalogPage=0;renderCatalog();catalogOverlay.classList.add('open');loadExtraCatalog();}
 function closeCatalog(){catalogOverlay.classList.remove('open');}
 async function loadCatalogGame(game){
  closeCatalog();
