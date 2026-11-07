@@ -144,7 +144,7 @@ function decimal(){if(value==='Error'||waiting||done){value='0.';waiting=false;d
 function calc(a,b,o){return o==='+'?a+b:o==='−'?a-b:o==='×'?a*b:o==='÷'?(b===0?NaN:a/b):b}
 function choose(o){let n=Number(value);if(!Number.isFinite(n))return;if(op&&!waiting){stored=calc(stored,n,op);value=fmt(stored)}else stored=n;op=o;waiting=true;done=false;draw()}
 function equal(){if(secretEquals())return;if(!op||stored===null||waiting)return;value=fmt(calc(stored,Number(value),op));stored=null;op=null;waiting=true;done=true;draw()}
-function action(a){if(a==='clear'){value='0';stored=null;op=null;waiting=false;done=false;handleAcTap();if(acCounting)value=String(acCount)}
+function action(a){if(a==='clear'){value='0';stored=null;op=null;waiting=false;done=false;handleAcTap();if(schoolArmed)value=String(acCount)}
 else if(a==='sign'&&value!=='0'&&value!=='Error')value=value.startsWith('-')?value.slice(1):'-'+value;
 else if(a==='percent'&&value!=='Error')value=fmt(Number(value)/100);
 else if(a==='decimal')return decimal();
