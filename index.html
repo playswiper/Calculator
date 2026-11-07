@@ -43,6 +43,9 @@ button{cursor:pointer;touch-action:manipulation}
 .school.fullscreen .source{max-height:24dvh}
 .url-row{display:flex;gap:8px}
 .url-row input,.url-row select{min-width:0;background:#050505;color:white;border:1px solid #393939;border-radius:11px;padding:12px;font-family:"Fredoka",sans-serif}.url-row input{flex:1}.preset-row{display:flex;gap:8px;margin-top:10px}.preset-row select{flex:1;min-width:0;background:#050505;color:#fff;border:1px solid #393939;border-radius:11px;padding:12px;font-family:"Fredoka",sans-serif}.preset-row button{white-space:nowrap}.school.fullscreen .preset-row{flex-shrink:0}
+#builtInGamePreset{flex:1;min-width:0;background:#050505;color:#fff;border:1px solid #393939;border-radius:11px;padding:12px;font-family:"Fredoka",sans-serif}
+#loadBuiltInGame{white-space:nowrap}
+body.light-mode #builtInGamePreset{background:#fff;color:#111;border-color:#ccc}
 .primary{background:var(--orange);color:#111;border:0;border-radius:11px;padding:12px 16px;font-weight:700}
 .source{white-space:pre;overflow:auto;user-select:text;-webkit-user-select:text;max-height:48dvh;background:#050505;border:1px solid #333;border-radius:12px;padding:14px;font:12px/1.5 "Fredoka",sans-serif;color:#ddd;margin-top:14px;tab-size:2}
 #acCounter{position:absolute;top:10px;left:12px;color:#ff9f0a;font-size:12px;letter-spacing:.5px;display:none}
@@ -94,6 +97,14 @@ body.light-mode .url-row input,body.light-mode .url-row select,body.light-mode .
   <div class="url-row" id="sourceForm">
    <input id="siteUrl" type="text" placeholder="https://example.com" autocomplete="url" inputmode="url">
    <button class="primary" type="button" id="loadSource">Load Source</button>
+  </div>
+  <div class="preset-row">
+   <select id="builtInGamePreset" aria-label="Choose a built-in HTML game">
+    <option value="">Choose a built-in HTML game…</option>
+    <option value="cookie">Cookie Bakery — idle clicker</option>
+    <option value="slots">Lucky Slots — virtual coins</option>
+   </select>
+   <button class="primary" type="button" id="loadBuiltInGame">Load Game</button>
   </div>
   <div class="preset-row">
    <select id="gamePreset" aria-label="Choose a game website">
@@ -244,8 +255,58 @@ document.addEventListener('keydown',e=>{
 ['gesturestart','gesturechange','gestureend'].forEach(type=>document.addEventListener(type,e=>e.preventDefault(),{passive:false}));
 document.addEventListener('touchstart',e=>{if(e.touches&&e.touches.length>1)e.preventDefault();},{passive:false});
 
+
+const builtInPreset=$('builtInGamePreset');
+const gameClose='</scr'+'ipt>';
+const builtInGames={
+cookie:{
+ title:'Cookie Bakery',
+ html:`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Cookie Bakery</title><style>
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(circle at 50% 0,#49301e,#17100d 65%);color:#fff3df;font-family:system-ui,sans-serif;display:grid;place-items:center;padding:20px}.game{width:min(100%,850px);text-align:center}.eyebrow{color:#e6b77c;text-transform:uppercase;letter-spacing:3px;font-size:12px}.game h1{font-size:clamp(32px,7vw,58px);margin:8px 0}.stats{display:flex;justify-content:center;gap:12px;flex-wrap:wrap}.stat{background:#ffffff12;border:1px solid #ffffff20;padding:12px 20px;border-radius:16px;min-width:130px}.stat b{display:block;font-size:24px}.cookie{border:0;background:transparent;font-size:clamp(120px,30vw,210px);line-height:1;cursor:pointer;filter:drop-shadow(0 15px 12px #0008);transition:transform .08s}.cookie:active{transform:scale(.92)}.hint{color:#d9c3a8}.shop{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin:24px auto 0;text-align:left}.upgrade{background:#2b1b14;border:1px solid #805638;color:#fff3df;border-radius:14px;padding:14px;cursor:pointer}.upgrade:disabled{opacity:.45;cursor:not-allowed}.upgrade b{display:block;font-size:16px}.upgrade span{color:#e9bd8c;font-size:13px}.reset{margin-top:20px;background:transparent;color:#c9aa8b;border:1px solid #80634d;padding:8px 14px;border-radius:10px}
+</style></head><body><main class="game"><div class="eyebrow">A cozy idle game</div><h1>Cookie Bakery</h1><div class="stats"><div class="stat">Cookies<b id="cookies">0</b></div><div class="stat">Per second<b id="cps">0</b></div><div class="stat">Baked total<b id="total">0</b></div></div><p class="hint">Tap the cookie to bake. Hire helpers to bake while you relax.</p><button class="cookie" id="bake" aria-label="Bake a cookie">🍪</button><div class="shop" id="shop"></div><button class="reset" id="reset">Reset bakery</button></main><script>
+(()=>{
+const items=[{name:'Grandma',desc:'A very reliable baker',base:15,power:.2,emoji:'👵'},{name:'Cookie oven',desc:'Always warm and working',base:100,power:1,emoji:'🔥'},{name:'Bakery',desc:'A whole team of bakers',base:650,power:5,emoji:'🏪'},{name:'Cookie factory',desc:'Industrial cookie magic',base:4000,power:25,emoji:'🏭'}];
+let state={cookies:0,total:0,owned:[0,0,0,0]};
+try{const saved=JSON.parse(localStorage.getItem('cookieBakerySave'));if(saved&&Array.isArray(saved.owned)&&saved.owned.length===4)state={...state,...saved};}catch{}
+const fmt=n=>Math.floor(n).toLocaleString(),cps=()=>items.reduce((s,x,i)=>s+x.power*state.owned[i],0),cost=i=>Math.ceil(items[i].base*Math.pow(1.16,state.owned[i]));
+function save(){try{localStorage.setItem('cookieBakerySave',JSON.stringify(state));}catch{}}
+function render(){document.getElementById('cookies').textContent=fmt(state.cookies);document.getElementById('total').textContent=fmt(state.total);document.getElementById('cps').textContent=cps().toFixed(1);document.getElementById('shop').innerHTML=items.map((x,i)=>'<button class="upgrade" data-buy="'+i+'" '+(state.cookies<cost(i)?'disabled':'')+'><b>'+x.emoji+' '+x.name+' · '+state.owned[i]+'</b><span>'+x.desc+'<br>Cost: '+fmt(cost(i))+' · +'+x.power+'/sec</span></button>').join('');}
+document.getElementById('bake').addEventListener('click',()=>{state.cookies++;state.total++;render();save();});
+document.getElementById('shop').addEventListener('click',e=>{const b=e.target.closest('[data-buy]');if(!b)return;const i=Number(b.dataset.buy),c=cost(i);if(state.cookies<c)return;state.cookies-=c;state.owned[i]++;render();save();});
+document.getElementById('reset').addEventListener('click',()=>{if(confirm('Reset all bakery progress?')){state={cookies:0,total:0,owned:[0,0,0,0]};render();save();}});
+setInterval(()=>{const gain=cps()/10;if(gain){state.cookies+=gain;state.total+=gain;render();save();}},100);render();
+})();
+`+gameClose+`</body></html>`
+},
+slots:{
+ title:'Lucky Slots',
+ html:`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Lucky Slots</title><style>
+*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:20px;background:radial-gradient(circle at 50% 10%,#642a66,#170e25 70%);color:#fff;font-family:system-ui,sans-serif}.machine{width:min(100%,560px);text-align:center;background:#251432;border:2px solid #d9a7ff;border-radius:28px;padding:clamp(20px,5vw,38px);box-shadow:0 20px 70px #0008}.tag{color:#e8baff;letter-spacing:3px;text-transform:uppercase;font-size:12px}.machine h1{font-size:clamp(34px,8vw,54px);margin:8px}.balance{font-size:18px;color:#f3d9ff}.balance b{font-size:30px;color:#ffe36e}.reels{display:flex;justify-content:center;gap:10px;margin:26px 0}.reel{width:clamp(76px,22vw,130px);height:clamp(90px,25vw,145px);display:grid;place-items:center;background:linear-gradient(#fff,#e9d9ff);border:5px solid #ffcf63;border-radius:18px;color:#251432;font-size:clamp(45px,12vw,76px);box-shadow:inset 0 4px 10px #0003}.spin{border:0;border-radius:999px;background:linear-gradient(135deg,#ffe77b,#ff9d35);color:#35163c;font-weight:900;font-size:20px;padding:16px 46px;cursor:pointer;box-shadow:0 6px 0 #a84e27}.spin:disabled{opacity:.5}.message{min-height:30px;font-size:18px;color:#ffe69b;margin:18px 0}.paytable{color:#d6b8e5;font-size:13px;line-height:1.8}.small{font-size:11px;color:#a88db9;margin-top:16px}
+</style></head><body><main class="machine"><div class="tag">Just for fun · no real money</div><h1>🎰 Lucky Slots</h1><div class="balance">Virtual coins <b id="coins">500</b></div><div class="reels"><div class="reel" id="r0">🍒</div><div class="reel" id="r1">⭐</div><div class="reel" id="r2">🍋</div></div><button class="spin" id="spin">SPIN · 10 COINS</button><div class="message" id="message">Try your luck!</div><div class="paytable">Three 7️⃣ = 1000 · Three 💎 = 250 · Three matching = 100<br>Two matching = 20 · Spin costs 10 coins</div><p class="small">Fictional arcade game with free virtual points. No purchases or cash prizes.</p></main><script>
+(()=>{
+const symbols=['🍒','🍋','🍇','⭐','🔔','💎','7️⃣'];let coins=500,spinning=false;
+const els=[0,1,2].map(i=>document.getElementById('r'+i)),coinEl=document.getElementById('coins'),msg=document.getElementById('message'),btn=document.getElementById('spin');
+function render(){coinEl.textContent=coins.toLocaleString();btn.disabled=spinning||coins<10;btn.textContent=coins<10?'OUT OF COINS':'SPIN · 10 COINS';}
+function payout(a){if(a.every(x=>x==='7️⃣'))return 1000;if(a.every(x=>x==='💎'))return 250;if(a.every(x=>x===a[0]))return 100;if(a[0]===a[1]||a[1]===a[2]||a[0]===a[2])return 20;return 0;}
+btn.addEventListener('click',()=>{if(spinning||coins<10)return;spinning=true;coins-=10;msg.textContent='Spinning…';render();let ticks=0;const timer=setInterval(()=>{els.forEach(el=>el.textContent=symbols[Math.floor(Math.random()*symbols.length)]);ticks++;if(ticks>=12){clearInterval(timer);const result=els.map(()=>symbols[Math.floor(Math.random()*symbols.length)]);result.forEach((s,i)=>els[i].textContent=s);const win=payout(result);coins+=win;msg.textContent=win?'You won '+win+' coins! ✨':'No match this time — spin again!';spinning=false;render();}},85);});
+render();
+})();
+`+gameClose+`</body></html>`
+}
+};
+function loadBuiltInGame(){
+ const game=builtInGames[builtInPreset.value];
+ if(!game){$('sourceError').textContent='Choose a built-in game first.';return;}
+ $('sourceOutput').textContent=game.html;$('sourceError').textContent='';
+ $('loadProgress').textContent=game.title+' HTML loaded. Press Run Code to launch it in about:blank.';
+ $('loadProgressTrack').style.display='none';$('loadProgressBar').style.width='0';
+ siteInput.value='';lastBaseUrl='https://playswiper.github.io/Calculator/';
+}
+builtInPreset.addEventListener('change',()=>{if(builtInPreset.value)loadBuiltInGame();});
+$('loadBuiltInGame').addEventListener('click',loadBuiltInGame);
+
 const preset=$('gamePreset'),siteInput=$('siteUrl');
-preset.addEventListener('change',()=>{if(preset.value)siteInput.value=preset.value;});
+preset.addEventListener('change',()=>{if(preset.value){builtInPreset.value='';siteInput.value=preset.value;}});
 $('loadSource').addEventListener('click',loadSource);
 siteInput.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();loadSource();}});
 async function readWithProgress(response){
