@@ -287,7 +287,7 @@ async function loadSource(){
    ['Direct',url.href,'direct'],
    ['cors.dev','https://proxy.cors.dev/'+url.href,'proxy'],
    ['AllOrigins','https://api.allorigins.win/raw?url='+encodeURIComponent(url.href),'proxy'],
-   ['CodeTabs','https://api.codetabs.com/v1/proxy?quest='+encodeURIComponent(url.href),'proxy']
+   ['ThingProxy','https://thingproxy.freeboard.io/fetch/'+url.href,'proxy']
   ];
   for(const [label,endpoint,kind] of attempts){
    try{
