@@ -284,23 +284,24 @@ async function loadSource(){
  try{
   let response=null;const errors=[];
   const attempts=[
-   ['Direct',url.href],
-   ['AllOrigins','https://api.allorigins.win/raw?url='+encodeURIComponent(url.href)],
-   ['CodeTabs','https://api.codetabs.com/v1/proxy?quest='+encodeURIComponent(url.href)]
+   ['Direct',url.href,'direct'],
+   ['cors.dev','https://proxy.cors.dev/'+url.href,'proxy'],
+   ['AllOrigins','https://api.allorigins.win/raw?url='+encodeURIComponent(url.href),'proxy'],
+   ['CodeTabs','https://api.codetabs.com/v1/proxy?quest='+encodeURIComponent(url.href),'proxy']
   ];
-  for(const [label,endpoint] of attempts){
+  for(const [label,endpoint,kind] of attempts){
    try{
     progress.textContent='Trying '+label+'…';
     const candidate=await fetch(endpoint,{mode:'cors',credentials:'omit',redirect:'follow'});
     if(!candidate.ok)throw new Error('HTTP '+candidate.status);
-    response=candidate;break;
+    response=candidate;lastBaseUrl=kind==='direct'?(candidate.url||url.href):url.href;break;
    }catch(err){errors.push(label+': '+(err.message||'request failed'));}
   }
   if(!response)throw new Error(errors.join(' | '));
   const source=await readWithProgress(response);
   if(!source.trim())throw new Error('The server returned an empty page.');
   output.textContent=source;
-  lastBaseUrl=response.url.includes('allorigins')||response.url.includes('codetabs')?url.href:(response.url||url.href);
+  if(!lastBaseUrl)lastBaseUrl=url.href;
   progress.textContent='Source loaded successfully.';
   if(runAfterLoad){runAfterLoad=false;runLoadedSource();}
  }catch(err){
