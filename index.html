@@ -99,35 +99,15 @@ body.light-mode .url-row input,body.light-mode .url-row select,body.light-mode .
 <section class="overlay" id="schoolOverlay" role="dialog" aria-modal="true" aria-labelledby="schoolTitle">
  <div class="dialog school">
 
-  <div class="url-row" id="sourceForm">
-   <input id="siteUrl" type="text" placeholder="https://example.com" autocomplete="url" inputmode="url">
-   <button class="primary" type="button" id="loadSource">Load Source</button>
-  </div>
-  
+  <input id="siteUrl" type="hidden" value="">
   <div class="preset-row"><button class="primary" type="button" id="openGameCatalog" style="width:100%">Browse Open-Source Game Catalog · 133 Games</button></div>
   <div class="preset-row">
-   <select id="gamePreset" aria-label="Choose a game website">
-    <option value="">Choose a game website…</option>
-    <option value="https://www.coolmathgames.com/">Coolmath Games</option>
-    <option value="https://www.crazygames.com/">CrazyGames</option>
-    <option value="https://poki.com/">Poki</option>
-    <option value="https://www.y8.com/">Y8 Games</option>
-    <option value="https://www.miniclip.com/">Miniclip</option>
-    <option value="https://www.kongregate.com/">Kongregate</option>
-    <option value="https://itch.io/games">itch.io</option>
-    <option value="https://www.newgrounds.com/games">Newgrounds</option>
-    <option value="https://www.gamepix.com/">GamePix</option>
-    <option value="https://www.armorgames.com/">Armor Games</option>
-    <option value="https://www.addictinggames.com/">Addicting Games</option>
-    <option value="https://www.friv.com/">Friv</option>
-    <option value="https://www.gamesgames.com/">GamesGames</option>
-    <option value="https://www.primarygames.com/">PrimaryGames</option>
-    <option value="https://scratch.mit.edu/explore/projects/games/">Scratch Games</option>
-    <option value="https://www.pbskids.org/games/">PBS Kids Games</option>
-    <option value="https://www.funbrain.com/games">Funbrain</option>
-    <option value="https://www.mathplayground.com/">Math Playground</option>
-    <option value="https://mathkit.org/">MathKit.org — Hidden Classroom Games</option>
+   <select id="gamePreset" aria-label="Choose an approved website">
+    <option value="">Choose a website…</option>
+    <option value="https://playswiper.com/">Swiper — playswiper.com</option>
+    <option value="https://www.mystarsnight.com/">Mystarsnight.com</option>
    </select>
+   <button class="primary" type="button" id="loadSource">Load Website</button>
   </div>
   <p class="error" id="sourceError" style="margin-top:12px"></p>
   <div id="loadProgress" aria-live="polite"></div><div id="loadProgressTrack"><div id="loadProgressBar"></div></div>
@@ -308,9 +288,11 @@ $('catalogCategories').addEventListener('click',e=>{const b=e.target.closest('[d
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&catalogOverlay.classList.contains('open'))closeCatalog();});
 
 const preset=$('gamePreset');
-preset.addEventListener('change',()=>{if(preset.value){siteInput.value=preset.value;}});
-$('loadSource').addEventListener('click',loadSource);
-siteInput.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();loadSource();}});
+preset.addEventListener('change',()=>{siteInput.value=preset.value||'';});
+$('loadSource').addEventListener('click',()=>{
+ if(!preset.value){$('sourceError').textContent='Choose playswiper.com or mystarsnight.com first.';return;}
+ siteInput.value=preset.value;loadSource();
+});
 async function readWithProgress(response){
  const progress=$('loadProgress'),track=$('loadProgressTrack'),bar=$('loadProgressBar');
  const total=Number(response.headers.get('content-length'))||0,start=Date.now();
