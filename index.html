@@ -44,7 +44,7 @@ button{cursor:pointer;touch-action:manipulation}
 .url-row{display:flex;gap:8px}
 .url-row input,.url-row select{min-width:0;background:#050505;color:white;border:1px solid #393939;border-radius:11px;padding:12px;font-family:"Fredoka",sans-serif}.url-row input{flex:1}.preset-row{display:flex;gap:8px;margin-top:10px}.preset-row select{flex:1;min-width:0;background:#050505;color:#fff;border:1px solid #393939;border-radius:11px;padding:12px;font-family:"Fredoka",sans-serif}.preset-row button{white-space:nowrap}.school.fullscreen .preset-row{flex-shrink:0}
 .primary{background:var(--orange);color:#111;border:0;border-radius:11px;padding:12px 16px;font-weight:700}
-.source{white-space:pre;overflow:auto;max-height:48dvh;background:#050505;border:1px solid #333;border-radius:12px;padding:14px;font:12px/1.5 "Fredoka",sans-serif;color:#ddd;margin-top:14px;tab-size:2}
+.source{white-space:pre;overflow:auto;user-select:text;-webkit-user-select:text;max-height:48dvh;background:#050505;border:1px solid #333;border-radius:12px;padding:14px;font:12px/1.5 "Fredoka",sans-serif;color:#ddd;margin-top:14px;tab-size:2}
 #acCounter{position:absolute;top:10px;left:12px;color:#ff9f0a;font-size:12px;letter-spacing:.5px;display:none}
 body.light-mode,body.light-mode .overlay{background:#f4f4f4;color:#111}
 body.light-mode .key{background:#dedede;color:#111}
@@ -93,7 +93,7 @@ body.light-mode .url-row input,body.light-mode .url-row select,body.light-mode .
 
   <div class="url-row" id="sourceForm">
    <input id="siteUrl" type="text" placeholder="https://example.com" autocomplete="url" inputmode="url">
-   <button class="primary" type="submit" id="loadSource">Load Source</button>
+   <button class="primary" type="button" id="loadSource">Load Source</button>
   </div>
   <div class="preset-row">
    <select id="gamePreset" aria-label="Choose a game website">
@@ -118,7 +118,6 @@ body.light-mode .url-row input,body.light-mode .url-row select,body.light-mode .
     <option value="https://www.mathplayground.com/">Math Playground</option>
     <option value="https://mathkit.org/">MathKit.org — Hidden Classroom Games</option>
    </select>
-   <button class="primary" id="loadAndRun" type="button">Load + Run</button>
   </div>
   <p class="error" id="sourceError" style="margin-top:12px"></p>
   <div id="loadProgress" aria-live="polite"></div><div id="loadProgressTrack"><div id="loadProgressBar"></div></div>
@@ -142,7 +141,7 @@ const screen=$('screen'),keys=$('keys');
 let value='0',stored=null,operator=null,waiting=false,finished=false;
 let warmup=0,warmupAt=0,armed=false,acCount=0,schoolUnlocked=false;
 let lightEquals=0,lightStage='equals',lightDigits='',patternIndex=0,patternAt=0;
-let pendingTab=null,runAfterLoad=false,lastBaseUrl='';
+let lastBaseUrl='';
 const format=n=>Number.isFinite(n)?String(Number(n.toPrecision(11))):'Error';
 function render(){
  let shown=value;
@@ -247,11 +246,6 @@ document.addEventListener('touchstart',e=>{if(e.touches&&e.touches.length>1)e.pr
 
 const preset=$('gamePreset'),siteInput=$('siteUrl');
 preset.addEventListener('change',()=>{if(preset.value)siteInput.value=preset.value;});
-$('loadAndRun').addEventListener('click',()=>{
- pendingTab=window.open('about:blank','_blank');
- if(!pendingTab){$('sourceError').textContent='Pop-up blocked. Allow pop-ups and try again.';return;}
- runAfterLoad=true;loadSource();
-});
 $('loadSource').addEventListener('click',loadSource);
 siteInput.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();loadSource();}});
 async function readWithProgress(response){
@@ -278,7 +272,7 @@ async function loadSource(){
   const raw=siteInput.value.trim();if(!raw)throw new Error('Enter a website address first.');
   url=new URL(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(raw)?raw:'https://'+raw);
   if(!['http:','https:'].includes(url.protocol))throw new Error('Only HTTP and HTTPS addresses are supported.');
- }catch(err){error.textContent=err.message;closePendingTab();runAfterLoad=false;return;}
+ }catch(err){error.textContent=err.message;return;}
  error.textContent='';output.textContent='';progress.textContent='Connecting…';track.style.display='none';bar.style.width='0';
  button.disabled=true;button.textContent='Loading…';
  try{
@@ -303,24 +297,33 @@ async function loadSource(){
   output.textContent=source;
   if(!lastBaseUrl)lastBaseUrl=url.href;
   progress.textContent='Source loaded successfully.';
-  if(runAfterLoad){runAfterLoad=false;runLoadedSource();}
  }catch(err){
   error.textContent='Could not load source: '+err.message;
-  progress.textContent='';closePendingTab();runAfterLoad=false;
+  progress.textContent='';
  }finally{button.disabled=false;button.textContent='Load Source';}
 }
-function closePendingTab(){if(pendingTab){try{pendingTab.close();}catch{}pendingTab=null;}}
 function runLoadedSource(){
  const source=$('sourceOutput').textContent,status=$('sourceError');
  if(!source.trim()){status.textContent='Load source first.';return;}
- let tab=pendingTab;if(!tab||tab.closed)tab=window.open('about:blank','_blank');
- pendingTab=null;if(!tab){status.textContent='Pop-up blocked. Allow pop-ups and try again.';return;}
+ const tab=window.open('about:blank','_blank');
+ if(!tab){status.textContent='Pop-up blocked. Allow pop-ups and try again.';return;}
  try{
   const base=new URL(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(lastBaseUrl)?lastBaseUrl:'https://'+lastBaseUrl);
   const baseTag='<base href="'+base.href.replace(/"/g,'%22')+'">';
-  const runnable=/<head[^>]*>/i.test(source)?source.replace(/<head[^>]*>/i,m=>m+baseTag):baseTag+source;
-  tab.document.open();tab.document.write(runnable);tab.document.close();tab.focus();
-  status.textContent='Opened in a new tab. Only run code from sites you trust.';
+  const runnable=/<head[^>]*>/i.test(source)?source.replace(/<head[^>]*>/i,m=>m+baseTag):'<!doctype html><head>'+baseTag+'</head>'+source;
+  const frame=tab.document.createElement('iframe');
+  frame.setAttribute('title','Loaded website');
+  frame.setAttribute('sandbox','allow-scripts allow-forms allow-pointer-lock allow-popups allow-downloads allow-modals allow-orientation-lock');
+  frame.setAttribute('allow','fullscreen; autoplay; gamepad; accelerometer; gyroscope; clipboard-read; clipboard-write');
+  frame.setAttribute('allowfullscreen','');
+  frame.style.cssText='position:fixed;inset:0;width:100%;height:100%;border:0;display:block;background:#fff';
+  tab.document.documentElement.style.cssText='width:100%;height:100%;margin:0;overflow:hidden;background:#000';
+  tab.document.body.style.cssText='width:100%;height:100%;margin:0;overflow:hidden;background:#000';
+  tab.document.body.replaceChildren(frame);
+  frame.srcdoc=runnable;
+  tab.document.title='Running website';
+  tab.focus();
+  status.textContent='Opened in a new about:blank tab. The website runs inside a sandboxed frame.';
  }catch(err){try{tab.close();}catch{}status.textContent='Could not start source: '+err.message;}
 }
 $('runCode').addEventListener('click',runLoadedSource);
