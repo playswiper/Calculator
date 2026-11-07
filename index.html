@@ -71,12 +71,12 @@ body.light-mode .url-row input,body.light-mode .url-row select,body.light-mode .
 .catalog-grid{grid-template-columns:repeat(auto-fill,minmax(min(100%,190px),1fr));gap:14px}
 .catalog-card{padding:0;overflow:hidden;min-height:224px;background:#19191f;border:1px solid #30303a;border-radius:17px;transition:transform .18s,border-color .18s,box-shadow .18s}
 .catalog-card:hover{transform:translateY(-4px);border-color:#68606e;box-shadow:0 12px 30px #0008}
-.game-art{height:124px;display:grid;place-items:center;position:relative;overflow:hidden;font-size:62px;background:var(--art)}
-.game-art:before,.game-art:after{content:"";position:absolute;border-radius:50%;filter:blur(1px);opacity:.28}
+.game-art{height:124px;display:grid;place-items:center;position:relative;overflow:hidden;background:#171722}.game-art img{width:100%;height:100%;object-fit:cover;display:block}
+.game-art:before,.game-art:after{content:"";position:absolute;border-radius:50%;filter:blur(1px);opacity:.28;pointer-events:none}
 .game-art:before{width:130px;height:130px;background:#fff;top:-75px;right:-15px}
 .game-art:after{width:90px;height:90px;background:#fff;bottom:-58px;left:-5px}
 .game-art span{position:relative;z-index:1;filter:drop-shadow(0 8px 8px #0008);transform:rotate(-7deg);transition:transform .2s}
-.catalog-card:hover .game-art span{transform:scale(1.15) rotate(5deg)}
+.catalog-card:hover .game-art img{transform:scale(1.06)}.game-art img{transition:transform .2s}
 .game-card-info{padding:11px 12px 12px;display:flex;flex-direction:column;flex:1}
 .catalog-card h3{font-size:16px;margin:0 0 8px}
 .catalog-card p{font-size:11px!important;color:#999!important;margin:0 0 10px!important}
@@ -126,7 +126,7 @@ body.light-mode .url-row input,body.light-mode .url-row select,body.light-mode .
  <div class="dialog school">
 
   <input id="siteUrl" type="hidden" value="">
-  <div class="preset-row"><button class="primary" type="button" id="openGameCatalog" style="width:100%">🎮 Browse Games · 141 Games</button></div>
+  <div class="preset-row"><button class="primary" type="button" id="openGameCatalog" style="width:100%">🎮 Browse Games</button></div>
   <div class="preset-row">
    <select id="gamePreset" aria-label="Choose a website">
     <option value="">Choose a website…</option>
@@ -139,7 +139,7 @@ body.light-mode .url-row input,body.light-mode .url-row select,body.light-mode .
   <div id="loadProgress" aria-live="polite"></div><div id="loadProgressTrack"><div id="loadProgressBar"></div></div>
   <pre class="source" id="sourceOutput"></pre>
   <div class="dialog-actions">
-   <button class="secondary" id="runCode" type="button">Run Code</button>
+   <button class="secondary" id="runCode" type="button">Play Game</button>
    <button class="secondary" id="fullScreen" type="button">Full Screen</button>
    <button class="secondary" id="copySource" type="button">Copy</button>
    <button class="secondary" id="exitSchool" type="button">Exit</button>
@@ -154,10 +154,10 @@ body.light-mode .url-row input,body.light-mode .url-row select,body.light-mode .
  <div class="dialog catalog-dialog">
   <div class="catalog-heading"><div><div class="catalog-kicker">THE ARCADE</div><h1 id="catalogTitle">Play Games</h1><p>Pick a game, jump in, and have fun. New favorites are waiting.</p></div><button class="secondary catalog-close" id="catalogClose" type="button" aria-label="Close catalog">✕</button></div>
   <div class="catalog-categories" id="catalogCategories"><button type="button" data-category="All" class="active">All</button><button type="button" data-category="Arcade" class="">Arcade</button><button type="button" data-category="Action" class="">Action</button><button type="button" data-category="Puzzle" class="">Puzzle</button><button type="button" data-category="Adventure" class="">Adventure</button><button type="button" data-category="Racing" class="">Racing</button><button type="button" data-category="Skill" class="">Skill</button></div>
-  <div class="catalog-meta"><strong id="catalogCount"></strong><span>141 games · Pick your next favorite</span></div>
+  <div class="catalog-meta"><strong id="catalogCount"></strong><span>Pick a game and jump straight in</span></div>
   <div class="catalog-grid" id="catalogGrid"></div>
   <div class="catalog-pagination"><button class="secondary" id="catalogPrev" type="button">← Previous</button><span id="catalogPageLabel"></span><button class="secondary" id="catalogNext" type="button">Next →</button></div>
-  <p class="catalog-footnote">Choose a game to start playing.</p>
+  <p class="catalog-footnote">Select a game to launch it in its own full-window tab.</p>
  </div>
 </section>
 
@@ -213,7 +213,7 @@ function clearTap(){
    if(warmup>=10){armed=true;acCount=0;}
   }else{
    acCount++;
-   if(acCount>=100){schoolUnlocked=true;$('schoolOverlay').classList.add('open');}
+   if(acCount>=100){schoolUnlocked=true;openCatalog();}
   }
   if(armed&&!schoolUnlocked)value=String(acCount);
  }
@@ -294,8 +294,8 @@ function renderCatalog(){
  const pages=Math.max(1,Math.ceil(filtered.length/catalogPageSize));
  catalogPage=Math.min(catalogPage,pages-1);
  const items=filtered.slice(catalogPage*catalogPageSize,(catalogPage+1)*catalogPageSize);
- $('catalogCount').textContent=filtered.length+' open-source games';
- const artThemes=['linear-gradient(135deg,#ff7b54,#b83280)','linear-gradient(135deg,#1d9bf0,#174ea6)','linear-gradient(135deg,#25b99a,#176b62)','linear-gradient(135deg,#9b6cff,#472d91)','linear-gradient(135deg,#ffb52e,#dc552b)','linear-gradient(135deg,#e95e9b,#7c3db8)','linear-gradient(135deg,#3e9fe8,#2454a5)','linear-gradient(135deg,#9ccf54,#317a4b)'];const artIcons={'2048':'🔢','8-Bit Quest':'🧙','Agar':'🟣','Asteroids':'☄️','Breakout':'🧱','Bubble Shooter':'🫧','Car Dodge':'🏎️','Color Match':'🎨','Connect Four':'🔴','Doodle Jump':'🐸','Flappy Bird':'🐤','Frogger':'🐸','Minesweeper':'💣','Pac-Man':'🟡','Pong':'🏓','Snake':'🐍','Space Invaders':'👾','Tetris':'🟪','Whack-a-Mole':'🔨','Cookie Clicker':'🍪'};$('catalogGrid').innerHTML=items.map((g,i)=>'<article class="catalog-card"><div class="game-art" style="--art:'+artThemes[(catalogPage*catalogPageSize+i)%artThemes.length]+'"><span>'+escapeCatalogText(g.icon||artIcons[g.title]||'🎮')+'</span></div><div class="game-card-info"><div class="catalog-card-top"><span class="catalog-tag">'+escapeCatalogText(g.category)+'</span></div><h3>'+escapeCatalogText(g.title)+'</h3><button type="button" class="catalog-load" data-index="'+i+'">▶ Play Now</button></div></article>').join('');
+ $('catalogCount').textContent=filtered.length+' games';
+ const artThemes=['linear-gradient(135deg,#ff7b54,#b83280)','linear-gradient(135deg,#1d9bf0,#174ea6)','linear-gradient(135deg,#25b99a,#176b62)','linear-gradient(135deg,#9b6cff,#472d91)','linear-gradient(135deg,#ffb52e,#dc552b)','linear-gradient(135deg,#e95e9b,#7c3db8)','linear-gradient(135deg,#3e9fe8,#2454a5)','linear-gradient(135deg,#9ccf54,#317a4b)'];const artIcons={'2048':'🔢','8-Bit Quest':'🧙','Agar':'🟣','Asteroids':'☄️','Breakout':'🧱','Bubble Shooter':'🫧','Car Dodge':'🏎️','Color Match':'🎨','Connect Four':'🔴','Doodle Jump':'🐸','Flappy Bird':'🐤','Frogger':'🐸','Minesweeper':'💣','Pac-Man':'🟡','Pong':'🏓','Snake':'🐍','Space Invaders':'👾','Tetris':'🟪','Whack-a-Mole':'🔨','Cookie Clicker':'🍪'};$('catalogGrid').innerHTML=items.map((g,i)=>{const icon=escapeCatalogText(g.icon||artIcons[g.title]||'🎮');const bg=artThemes[(catalogPage*catalogPageSize+i)%artThemes.length];const svg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffffff" stop-opacity=".24"/><stop offset="1" stop-color="#000000" stop-opacity=".25"/></linearGradient></defs><rect width="640" height="360" fill="#171722"/><rect width="640" height="360" fill="url(#g)"/><circle cx="520" cy="70" r="115" fill="#fff" opacity=".12"/><circle cx="90" cy="310" r="130" fill="#fff" opacity=".10"/><text x="320" y="225" text-anchor="middle" font-size="170">'+icon+'</text></svg>';const art='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);return '<article class="catalog-card"><div class="game-art"><img loading="lazy" alt="" src="'+art+'"></div><div class="game-card-info"><div class="catalog-card-top"><span class="catalog-tag">'+escapeCatalogText(g.category)+'</span></div><h3>'+escapeCatalogText(g.title)+'</h3><button type="button" class="catalog-load" data-index="'+i+'">▶ Play Now</button></div></article>';}).join('');
  $('catalogPageLabel').textContent='Page '+(catalogPage+1)+' of '+pages;
  $('catalogPrev').disabled=catalogPage===0;$('catalogNext').disabled=catalogPage>=pages-1;
  $('catalogCategories').querySelectorAll('[data-category]').forEach(b=>b.classList.toggle('active',b.dataset.category===catalogCategory));
@@ -304,14 +304,53 @@ function renderCatalog(){
 function openCatalog(){catalogPage=0;renderCatalog();catalogOverlay.classList.add('open');}
 function closeCatalog(){catalogOverlay.classList.remove('open');}
 async function loadCatalogGame(game){
- closeCatalog();$('schoolOverlay').classList.add('open');siteInput.value=game.url;
- $('sourceError').textContent='';$('loadProgress').textContent='Loading '+game.title+'…';
- await loadSource();
- if($('sourceOutput').textContent.trim()){
-  const attribution='<!-- Open-source game: '+game.title+' | Author: '+game.author+' | Repository: https://github.com/'+game.author+'/'+game.repo+' | License: MIT. Original source follows. -->\n';
-  $('sourceOutput').textContent=attribution+$('sourceOutput').textContent;
-  $('loadProgress').textContent=game.title+' loaded from '+game.source+'. Opening your game…';
+ closeCatalog();
+ const tab=window.open('about:blank','_blank');
+ if(!tab){catalogOverlay.classList.add('open');$('catalogCount').textContent='Allow pop-ups to launch games.';return;}
+ tab.document.open();
+ tab.document.write('<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>Loading '+escapeCatalogText(game.title)+'</title><style>html,body{margin:0;width:100%;height:100%;background:#08080c;color:white;font-family:system-ui;display:grid;place-items:center}body{font-size:16px} .load{opacity:.8}</style></head><body><div class="load">Loading '+escapeCatalogText(game.title)+'…</div></body></html>');
+ tab.document.close();
+ siteInput.value=game.url;
+ $('sourceError').textContent='';
+ $('loadProgress').textContent='Loading '+game.title+'…';
+ try{
+  await loadSource();
+  const source=$('sourceOutput').textContent;
+  if(!source.trim())throw new Error($('sourceError').textContent||'This game could not be loaded.');
+  await writeGameToTab(tab,source,game);
+  $('loadProgress').textContent=game.title+' is ready.';
+ }catch(err){
+  try{tab.document.body.innerHTML='<main style="font:16px system-ui;padding:28px;color:white;background:#08080c;min-height:100vh;box-sizing:border-box"><h2>Could not load this game</h2><p>'+escapeCatalogText(err.message||String(err))+'</p><p>Try another game.</p></main>';}catch{}
+  $('sourceError').textContent=err.message||String(err);
  }
+}
+async function writeGameToTab(tab,source,game){
+ const baseUrl=lastBaseUrl||game.url;
+ const base=new URL(baseUrl);
+ const parsed=new DOMParser().parseFromString(source,'text/html');
+ const target=tab.document;
+ target.open();
+ target.write('<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>'+escapeCatalogText(game.title)+'</title></head><body></body></html>');
+ target.close();
+ const root=target.documentElement;
+ for(const attr of [...parsed.documentElement.attributes])root.setAttribute(attr.name,attr.value);
+ root.innerHTML=parsed.documentElement.innerHTML;
+ target.title=parsed.title||game.title;
+ const baseTag=target.createElement('base');baseTag.href=base.href;target.head.insertBefore(baseTag,target.head.firstChild);
+ target.documentElement.style.cssText='min-height:100%;';
+ target.body.style.minHeight='100vh';
+ const scripts=[...target.querySelectorAll('script')];
+ for(const inert of scripts){
+  if(!inert.isConnected)continue;
+  const live=target.createElement('script');
+  for(const attr of [...inert.attributes])live.setAttribute(attr.name,attr.value);
+  if(!inert.hasAttribute('async'))live.async=false;
+  live.textContent=inert.textContent;
+  const wait=live.src&&!live.async?new Promise(resolve=>{live.addEventListener('load',resolve,{once:true});live.addEventListener('error',resolve,{once:true});}):null;
+  inert.replaceWith(live);
+  if(wait)await Promise.race([wait,new Promise(resolve=>setTimeout(resolve,12000))]);
+ }
+ tab.focus();
 }
 $('openGameCatalog').addEventListener('click',openCatalog);
 $('catalogClose').addEventListener('click',closeCatalog);
@@ -324,7 +363,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&catalogOverlay.clas
 const preset=$('gamePreset');
 preset.addEventListener('change',()=>{siteInput.value=preset.value||'';});
 $('loadSource').addEventListener('click',()=>{
- if(!preset.value){$('sourceError').textContent='Choose playswiper.com or mystarsnight.com first.';return;}
+ if(!preset.value){$('sourceError').textContent='Choose a website first.';return;}
  siteInput.value=preset.value;loadSource();
 });
 async function readWithProgress(response){
@@ -353,7 +392,7 @@ async function loadSource(){
   if(!['http:','https:'].includes(url.protocol))throw new Error('Only HTTP and HTTPS addresses are supported.');
  }catch(err){error.textContent=err.message;return;}
  error.textContent='';output.textContent='';progress.textContent='Connecting…';track.style.display='none';bar.style.width='0';
- button.disabled=true;button.textContent='Loading…';
+ button.disabled=true;button.textContent='Open Website';
  try{
   let response=null;const errors=[];
   const attempts=[
@@ -366,7 +405,7 @@ async function loadSource(){
    const controller=new AbortController();
    const timeout=setTimeout(()=>controller.abort(new Error('Request timed out after 18 seconds')),18000);
    try{
-    progress.textContent='Trying '+label+'…';
+    progress.textContent='Getting things ready…';
     const candidate=await fetch(endpoint,{mode:'cors',credentials:'omit',redirect:'follow',signal:controller.signal,cache:'no-store'});
     if(!candidate.ok)throw new Error('HTTP '+candidate.status);
     const length=Number(candidate.headers.get('content-length'))||0;
@@ -382,17 +421,17 @@ async function loadSource(){
   if(!source.trim())throw new Error('The server returned an empty page.');
   output.textContent=source;
   if(!lastBaseUrl)lastBaseUrl=url.href;
-  progress.textContent='Game ready!';
+  progress.textContent='Ready!';
  }catch(err){
-  error.textContent='Could not start game: '+err.message;
+  error.textContent='Could not load game: '+err.message;
   progress.textContent='';
  }finally{button.disabled=false;button.textContent='Loading…';}
 }
 async function runLoadedSource(){
  const source=$('sourceOutput').textContent,status=$('sourceError');
- if(!source.trim()){status.textContent='Choose a game first.';return;}
+ if(!source.trim()){status.textContent='Pick a game first.';return;}
  const tab=window.open('about:blank','_blank');
- if(!tab){status.textContent='Pop-up blocked. Allow pop-ups and try again.';return;}
+ if(!tab){status.textContent='Allow pop-ups to open the game.';return;}
  try{
   const baseUrl=lastBaseUrl||siteInput.value.trim();
   const base=new URL(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(baseUrl)?baseUrl:'https://'+baseUrl);
@@ -422,8 +461,8 @@ async function runLoadedSource(){
    if(waitForLoad)await Promise.race([waitForLoad,new Promise(resolve=>setTimeout(resolve,12000))]);
   }
   tab.focus();
-  status.textContent='Running the HTML directly in the new about:blank tab (no iframe). External scripts and assets load from the original website when the server allows them.';
- }catch(err){status.textContent='Could not start source: '+(err.message||String(err));}
+  status.textContent='Game opened in a new tab.';
+ }catch(err){status.textContent='Could not open game: '+(err.message||String(err));}
 }
 $('runCode').addEventListener('click',runLoadedSource);
 $('exitSchool').addEventListener('click',()=>$('schoolOverlay').classList.remove('open'));
