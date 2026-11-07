@@ -37,7 +37,7 @@ button{cursor:pointer;touch-action:manipulation}
 .dialog-actions{display:flex;gap:10px;margin-top:14px}
 .dialog-actions button{flex:1}
 .secondary{font-size:14px;padding:12px}
-.error{color:#ff7777!important;min-height:18px}
+.error{color:#ff7777!important;min-height:18px}#loadProgress{font-size:12px;color:#aaa;min-height:18px;margin-top:6px}#loadProgressTrack{height:4px;background:#292929;border-radius:99px;overflow:hidden;margin-top:7px;display:none}#loadProgressBar{height:100%;width:0;background:var(--orange);transition:width .15s linear}
 .school{width:min(100%,900px)}
 .school.fullscreen{position:fixed;inset:0;width:100%;height:100dvh;max-height:none;border-radius:0;display:flex;flex-direction:column}
 .school.fullscreen .source{max-height:24dvh}
@@ -120,7 +120,7 @@ body.light-mode .url-row input,body.light-mode .url-row select,body.light-mode .
    </select>
    <button class="primary" id="loadAndRun" type="button">Load + Run</button>
   </div>
-  <p class="error" id="sourceError" style="margin-top:12px"></p>
+  <p class="error" id="sourceError" style="margin-top:12px"></p>\n  <div id="loadProgress" aria-live="polite"></div><div id="loadProgressTrack"><div id="loadProgressBar"></div></div>
   <pre class="source" id="sourceOutput"></pre>
   <div class="dialog-actions">
    <button class="secondary" id="runCode" type="button">Run Code</button>
@@ -233,70 +233,113 @@ document.getElementById('exitSchool').addEventListener('click',()=>document.getE
 const gamePreset=document.getElementById('gamePreset'),siteUrl=document.getElementById('siteUrl');
 gamePreset.addEventListener('change',()=>{if(gamePreset.value)siteUrl.value=gamePreset.value;});
 // Load the selected website's HTML source and execute it in about:blank (no iframe).
-let runAfterLoad=false;
+let runAfterLoad=false,pendingRunTab=null,lastLoadedBaseUrl='';
 document.getElementById('loadAndRun').addEventListener('click',()=>{
+ // Open the blank tab synchronously inside the tap handler so popup blockers allow it.
+ pendingRunTab=window.open('about:blank','_blank');
+ if(!pendingRunTab){
+  document.getElementById('sourceError').textContent='Your browser blocked the blank tab. Allow pop-ups for this site, then try again.';
+  return;
+ }
  runAfterLoad=true;
  document.getElementById('sourceForm').requestSubmit();
 });
+async function readResponseWithProgress(response,progress,track,bar){
+ const total=Number(response.headers.get('content-length'))||0;
+ const started=Date.now();
+ if(!response.body||!response.body.getReader){
+  progress.textContent=total?'Downloading… Estimated time remaining: calculating':'Downloading… Estimated time remaining unavailable';
+  return await response.text();
+ }
+ const reader=response.body.getReader();
+ const chunks=[];
+ let received=0;
+ while(true){
+  const part=await reader.read();
+  if(part.done)break;
+  chunks.push(part.value);received+=part.value.length;
+  const elapsed=Math.max((Date.now()-started)/1000,.1);
+  if(total>0){
+   const percent=Math.min(100,received/total*100);
+   const rate=received/elapsed;
+   const remaining=rate>0?Math.max(0,(total-received)/rate):0;
+   progress.textContent='Downloading '+Math.round(percent)+'% · Estimated time remaining: '+(remaining<1?'less than 1 second':Math.ceil(remaining)+' seconds');
+   track.style.display='block';bar.style.width=percent+'%';
+  }else{
+   progress.textContent='Downloading… Estimated time remaining unavailable (server does not share file size)';
+   track.style.display='block';bar.style.width='indeterminate';
+  }
+ }
+ const blob=new Blob(chunks);
+ return await blob.text();
+}
 document.getElementById('sourceForm').addEventListener('submit',async e=>{
  e.preventDefault();
  const input=document.getElementById('siteUrl'),error=document.getElementById('sourceError'),output=document.getElementById('sourceOutput'),button=document.getElementById('loadSource');
+ const progress=document.getElementById('loadProgress'),track=document.getElementById('loadProgressTrack'),bar=document.getElementById('loadProgressBar');
  let url;
  try{
   const raw=input.value.trim();
   if(!raw)throw new Error();
   url=new URL(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(raw)?raw:'https://'+raw);
   if(!['http:','https:'].includes(url.protocol))throw new Error();
- }catch{error.textContent='Check the web address and try again.';return}
- error.textContent='';
- output.textContent='Loading source code…';
- button.disabled=true;button.textContent='Loading';
+ }catch{
+  error.textContent='Check the web address and try again.';
+  if(pendingRunTab){pendingRunTab.close();pendingRunTab=null;}
+  runAfterLoad=false;return;
+ }
+ error.textContent='';progress.textContent='Connecting…';track.style.display='none';bar.style.width='0';
+ output.textContent='';button.disabled=true;button.textContent='Loading…';
  try{
-  let source='';
+  let response;
   try{
-   const direct=await fetch(url.href,{method:'GET',mode:'cors',credentials:'omit',redirect:'follow'});
-   if(!direct.ok)throw new Error('Direct request blocked');
-   source=await direct.text();
+   response=await fetch(url.href,{method:'GET',mode:'cors',credentials:'omit',redirect:'follow'});
+   if(!response.ok)throw new Error('Direct request blocked');
   }catch(directError){
    const proxy='https://api.allorigins.win/raw?url='+encodeURIComponent(url.href);
-   const proxied=await fetch(proxy,{method:'GET',mode:'cors',credentials:'omit'});
-   if(!proxied.ok)throw new Error('Source proxy unavailable');
-   source=await proxied.text();
+   response=await fetch(proxy,{method:'GET',mode:'cors',credentials:'omit'});
+   if(!response.ok)throw new Error('Source proxy unavailable');
   }
+  progress.textContent='Downloading source… Estimated time remaining: calculating';
+  const source=await readResponseWithProgress(response,progress,track,bar);
   if(!source.trim())throw new Error('Empty response');
   output.textContent=source;
-  error.textContent='Source code loaded.';
-  if(runAfterLoad){runAfterLoad=false;runLoadedSource()}
+  lastLoadedBaseUrl=response.url&&response.url.includes('allorigins')?url.href:(response.url||url.href);
+  progress.textContent='Download complete.';
+  if(runAfterLoad){runAfterLoad=false;runLoadedSource();}
  }catch(err){
   runAfterLoad=false;
   output.textContent='';
-  error.textContent='This website did not provide readable source. It may require sign-in, block proxy requests, or be protected by its server.';
- }finally{button.disabled=false;button.textContent='Load'}
+  progress.textContent='';
+  error.textContent='Could not load this website source. The site may block access, require sign-in, or prevent proxy requests.';
+  if(pendingRunTab){try{pendingRunTab.close()}catch{}pendingRunTab=null;}
+ }finally{button.disabled=false;button.textContent='Load Source'}
 });
-
 function runLoadedSource(){
  const source=document.getElementById('sourceOutput').textContent;
  const status=document.getElementById('sourceError');
  if(!source.trim()){status.textContent='Load source code first.';return}
- // Execute the downloaded page in a new blank tab, preserving relative asset paths.
- const tab=window.open('about:blank','_blank');
- if(!tab){status.textContent='Allow pop-ups to run the source in a new tab.';return}
+ let tab=pendingRunTab;
+ if(!tab||tab.closed)tab=window.open('about:blank','_blank');
+ pendingRunTab=null;
+ if(!tab){status.textContent='Allow pop-ups to run the source in a new blank tab.';return}
  try{
-  const raw=siteUrl.value.trim();
-  const target=new URL(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(raw)?raw:'https://'+raw);
+  const baseUrl=lastLoadedBaseUrl||siteUrl.value.trim();
+  const target=new URL(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(baseUrl)?baseUrl:'https://'+baseUrl);
   const baseTag='<base href="'+target.href.replace(/"/g,'%22')+'">';
   const runnable=/<head[^>]*>/i.test(source)?source.replace(/<head[^>]*>/i,match=>match+baseTag):baseTag+source;
   tab.document.open();
   tab.document.write(runnable);
   tab.document.close();
   tab.focus();
-  status.textContent='Source is running in a new tab. Only run code from websites you trust.';
+  status.textContent='Website opened in a new blank tab. Only run code from websites you trust.';
  }catch(err){
-  tab.close();
-  status.textContent='The source could not be started in a new tab.';
+  try{tab.close()}catch{}
+  status.textContent='The source could not be started in the blank tab.';
  }
 }
 document.getElementById('runCode').addEventListener('click',runLoadedSource);
+
 
 document.getElementById('fullScreen').addEventListener('click',async()=>{
  const panel=document.querySelector('#schoolOverlay .school');
