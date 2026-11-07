@@ -20,7 +20,7 @@ button{cursor:pointer;touch-action:manipulation}
 #screen{width:100%;text-align:right;white-space:nowrap;overflow:hidden;font-size:clamp(48px,14vw,76px);font-weight:300;letter-spacing:-3px;line-height:1.1}
 .keys{display:grid;grid-template-columns:repeat(4,1fr);gap:clamp(8px,2.3vw,13px)}
 .key{appearance:none;border:0;border-radius:50%;aspect-ratio:1;background:#292929;color:#fff;font-size:clamp(22px,6vw,30px);font-weight:400;display:grid;place-items:center;min-width:0;transition:filter .12s,transform .08s;-webkit-tap-highlight-color:transparent}
-.key:active{filter:brightness(1.45);transform:scale(.94)}
+.key:active{filter:brightness(1.25)}
 .utility{background:#a5a5a5;color:#000}
 .operator{background:var(--orange);color:#fff;font-size:clamp(27px,7vw,36px)}
 .operator.selected{background:#fff;color:var(--orange)}
@@ -144,7 +144,7 @@ function decimal(){if(value==='Error'||waiting||done){value='0.';waiting=false;d
 function calc(a,b,o){return o==='+'?a+b:o==='−'?a-b:o==='×'?a*b:o==='÷'?(b===0?NaN:a/b):b}
 function choose(o){let n=Number(value);if(!Number.isFinite(n))return;if(op&&!waiting){stored=calc(stored,n,op);value=fmt(stored)}else stored=n;op=o;waiting=true;done=false;draw()}
 function equal(){if(secretEquals())return;if(!op||stored===null||waiting)return;value=fmt(calc(stored,Number(value),op));stored=null;op=null;waiting=true;done=true;draw()}
-function action(a){if(a==='clear'){value='0';stored=null;op=null;waiting=false;done=false}
+function action(a){if(a==='clear'){value='0';stored=null;op=null;waiting=false;done=false;handleAcTap();if(acCounting)value=String(acCount)}
 else if(a==='sign'&&value!=='0'&&value!=='Error')value=value.startsWith('-')?value.slice(1):'-'+value;
 else if(a==='percent'&&value!=='Error')value=fmt(Number(value)/100);
 else if(a==='decimal')return decimal();
@@ -153,6 +153,14 @@ else if(a==='equals')return equal();draw()}
 keys.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.digit!==undefined)digit(b.dataset.digit);else if(b.dataset.op)choose(b.dataset.op);else if(b.dataset.action)action(b.dataset.action)});
 document.addEventListener('keydown',e=>{if(document.getElementById('codeOverlay').classList.contains('open')){if(/^[0-9]$/.test(e.key))addCode(e.key);else if(e.key==='Backspace')addCode('back');else if(e.key==='Enter')unlock();else if(e.key==='Escape')closeCode();return}if(/^[0-9]$/.test(e.key))digit(e.key);else if(e.key==='.'||e.key===',')decimal();else if(e.key==='Enter'||e.key==='='){e.preventDefault();equal()}else if(e.key==='Escape'||e.key==='Delete')action('clear');else if(e.key==='Backspace')action('backspace');else if(({'+':1,'-':1,'*':1,'/':1})[e.key])choose(({'+':'+','-':'−','*':'×','/':'÷'})[e.key]);else if(e.key==='%')action('percent')});
 draw();
+
+// Prevent iOS Safari gesture zoom while rapidly tapping calculator keys.
+['gesturestart','gesturechange','gestureend'].forEach(type=>{
+ document.addEventListener(type,e=>e.preventDefault(),{passive:false});
+});
+document.addEventListener('touchstart',e=>{
+ if(e.touches&&e.touches.length>1)e.preventDefault();
+},{passive:false});
 
 // Hidden School Mode unlock: 10 AC taps within 10 seconds, then 100 additional AC taps.
 const clearKey=document.getElementById('clearKey');
@@ -217,7 +225,7 @@ function secretEquals(){
  }
  return true;
 }
-clearKey.addEventListener('click',handleAcTap);
+
 document.getElementById('codeKeys').addEventListener('click',e=>{const b=e.target.closest('button');if(b)addCode(b.dataset.code)});
 document.getElementById('submitCode').addEventListener('click',unlock);
 document.getElementById('cancelCode').addEventListener('click',closeCode);
