@@ -10,11 +10,11 @@
 <title>Calculator</title>
 <style>
 :root{color-scheme:dark;--orange:#ff9f0a;--panel:#171717;--muted:#a5a5a5}
-*{box-sizing:border-box}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent; -webkit-touch-callout:none; user-select:none; -webkit-user-select:none; touch-action:manipulation}
 html,body{margin:0;min-height:100%;background:#000;color:#fff;font-family:"Fredoka",sans-serif}
 body{min-height:100dvh;display:grid;place-items:center;padding:16px}
 button,input{font:inherit}
-button{cursor:pointer}
+button{cursor:pointer;touch-action:manipulation}
 .calculator{width:min(100%,390px);display:flex;flex-direction:column;justify-content:flex-end;gap:clamp(9px,2vh,16px)}
 .display{height:clamp(120px,27vh,220px);display:flex;align-items:flex-end;justify-content:flex-end;padding:0 8px 12px;overflow:hidden}
 #screen{width:100%;text-align:right;white-space:nowrap;overflow:hidden;font-size:clamp(48px,14vw,76px);font-weight:300;letter-spacing:-3px;line-height:1.1}
@@ -45,7 +45,7 @@ button{cursor:pointer}
 .url-row input,.url-row select{min-width:0;background:#050505;color:white;border:1px solid #393939;border-radius:11px;padding:12px;font-family:"Fredoka",sans-serif}.url-row input{flex:1}.preset-row{display:flex;gap:8px;margin-top:10px}.preset-row select{flex:1;min-width:0;background:#050505;color:#fff;border:1px solid #393939;border-radius:11px;padding:12px;font-family:"Fredoka",sans-serif}.preset-row button{white-space:nowrap}.school.fullscreen .preset-row{flex-shrink:0}
 .primary{background:var(--orange);color:#111;border:0;border-radius:11px;padding:12px 16px;font-weight:700}
 .source{white-space:pre;overflow:auto;max-height:48dvh;background:#050505;border:1px solid #333;border-radius:12px;padding:14px;font:12px/1.5 "Fredoka",sans-serif;color:#ddd;margin-top:14px;tab-size:2}
-#acCounter{position:absolute;top:10px;left:12px;color:#ff9f0a;font-size:12px;letter-spacing:.5px;display:none}.display{position:relative}
+#acCounter{position:absolute;top:10px;left:12px;color:#ff9f0a;font-size:12px;letter-spacing:.5px;display:none}
 body.light-mode,body.light-mode .overlay{background:#f4f4f4;color:#111}
 body.light-mode .key{background:#dedede;color:#111}
 body.light-mode .utility{background:#bcbcbc;color:#111}
@@ -59,7 +59,7 @@ body.light-mode .url-row input,body.light-mode .url-row select,body.light-mode .
 </head>
 <body>
 <main class="calculator" aria-label="Calculator">
-  <div class="display"><span id="acCounter"></span><output id="screen" aria-live="polite">0</output></div>
+  <div class="display"><output id="screen" aria-live="polite">0</output></div>
   <div class="keys" id="keys">
     <button class="key utility" id="clearKey" data-action="clear">AC</button>
     <button class="key utility" data-action="sign">+/−</button>
@@ -154,35 +154,26 @@ keys.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)retur
 document.addEventListener('keydown',e=>{if(document.getElementById('codeOverlay').classList.contains('open')){if(/^[0-9]$/.test(e.key))addCode(e.key);else if(e.key==='Backspace')addCode('back');else if(e.key==='Enter')unlock();else if(e.key==='Escape')closeCode();return}if(/^[0-9]$/.test(e.key))digit(e.key);else if(e.key==='.'||e.key===',')decimal();else if(e.key==='Enter'||e.key==='='){e.preventDefault();equal()}else if(e.key==='Escape'||e.key==='Delete')action('clear');else if(e.key==='Backspace')action('backspace');else if(({'+':1,'-':1,'*':1,'/':1})[e.key])choose(({'+':'+','-':'−','*':'×','/':'÷'})[e.key]);else if(e.key==='%')action('percent')});
 draw();
 
-// School Mode unlock: 10 AC taps within 10 seconds, then 100 more AC taps.
+// Hidden School Mode unlock: 10 AC taps within 10 seconds, then 100 additional AC taps.
 const clearKey=document.getElementById('clearKey');
-const acCounter=document.getElementById('acCounter');
-let acWarmup=0,acWarmupStart=0,acCount=0,schoolUnlocked=false;
+let acWarmup=0,acWarmupStart=0,acCount=0,schoolArmed=false,schoolUnlocked=false;
 function handleAcTap(){
  const now=Date.now();
  if(schoolUnlocked)return;
- if(!acCount){
+ if(!schoolArmed){
   if(!acWarmup||now-acWarmupStart>10000){acWarmup=0;acWarmupStart=now}
   acWarmup++;
-  if(acWarmup>=10){
-   acCount=0;
-   acCounter.style.display='block';
-   acCounter.textContent='AC COUNT  0 / 100';
-   screen.textContent='0';
-  }
+  if(acWarmup>=10){schoolArmed=true;acCount=0;}
   return;
  }
  acCount++;
- acCounter.textContent='AC COUNT  '+acCount+' / 100';
  if(acCount>=100){
   schoolUnlocked=true;
-  acCounter.style.display='none';
   document.getElementById('schoolOverlay').classList.add('open');
  }
 }
 
-// Separate hidden sequence: five = taps, 1000, then 6767676767676767 within 8 seconds.
-// Completing it enables light mode and displays instructions for both secrets.
+// Hidden light-mode sequence. No progress counters or on-screen clues are shown.
 let hintEquals=0,hintStage='equals',hintNumber='',hintPatternIndex=0,hintPatternStarted=0;
 function secretDigit(d){
  if(hintStage==='number'){
@@ -191,10 +182,9 @@ function secretDigit(d){
   if(hintNumber.length>=4){
    if(hintNumber==='1000'){
     hintStage='pattern';hintPatternIndex=0;hintPatternStarted=Date.now();
-    screen.textContent='6-7-6-7';
-
+    hintNumber='';
    }else{
-    hintNumber='';screen.textContent='TRY 1000';
+    hintNumber='';screen.textContent='0';
    }
   }
   return true;
@@ -202,16 +192,18 @@ function secretDigit(d){
  if(hintStage==='pattern'){
   const expected=hintPatternIndex%2===0?'6':'7';
   if(Date.now()-hintPatternStarted>8000||d!==expected){
-   hintPatternIndex=0;hintPatternStarted=Date.now();
-
+   hintPatternIndex=d==='6'?1:0;
+   hintPatternStarted=Date.now();
+   hintNumber=d;
+   screen.textContent=hintNumber;
    return true;
   }
   hintPatternIndex++;
+  hintNumber+=d;
+  screen.textContent=hintNumber;
   if(hintPatternIndex>=16){
    hintStage='done';
    document.body.classList.add('light-mode');
-   acCounter.style.display='none';
-
   }
   return true;
  }
@@ -220,11 +212,8 @@ function secretDigit(d){
 function secretEquals(){
  if(hintStage!=='equals')return false;
  hintEquals++;
- screen.textContent='= '+hintEquals+'/5';
  if(hintEquals>=5){
   hintStage='number';hintNumber='';
-  screen.textContent='ENTER 1000';
-
  }
  return true;
 }
